@@ -1091,6 +1091,245 @@ button:focus-visible {
 
 .url-row__copy:hover { color: var(--green); }
 
+/* ── Badge variants ── */
+.badge--free {
+    background: var(--green-glow);
+    color: var(--green);
+    border: 1px solid rgba(0, 210, 211, 0.2);
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+}
+
+.badge--api {
+    background: var(--yellow-glow);
+    color: var(--yellow);
+    border: 1px solid rgba(254, 202, 87, 0.2);
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+}
+
+/* ── Chip status indicator ── */
+.chip__status {
+    font-size: 0.58rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    margin-left: 0.35rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+.chip__status--no-key {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--error);
+}
+.chip__status--has-key {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+/* ── Hunt Progress Bar ── */
+.hunt-progress {
+    padding: 0.5rem 1rem;
+    background: var(--bg-medium);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.hunt-progress__bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.35rem;
+}
+
+.hunt-progress__fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    width: 0%;
+    animation: progressPulse 2s ease-in-out infinite;
+}
+
+@keyframes progressPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.hunt-progress__info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+#huntProgressCount {
+    color: var(--green);
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+/* ── Settings Page ── */
+.settings-page {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    width: 100%;
+}
+
+.settings-page__scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem 2rem;
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.settings-page__title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.3rem;
+}
+
+.settings-page__desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1.2rem;
+    line-height: 1.5;
+}
+
+.settings-card {
+    margin-bottom: 0.8rem;
+}
+
+.settings-card code {
+    background: var(--bg-input);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--green);
+}
+
+/* ── Settings Status ── */
+.settings-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.settings-status__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0.65rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+}
+
+.settings-status__label {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.settings-status__value {
+    color: var(--green);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+.settings-status__value--inactive {
+    color: var(--text-muted);
+}
+
+.settings-status__value--warning {
+    color: var(--yellow);
+}
+
+/* ── Settings Info ── */
+.settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.settings-info__item {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.settings-info__item strong {
+    color: var(--text-primary);
+}
+
+/* ── Proxy Test Results ── */
+.proxy-test-results {
+    margin-top: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.proxy-test-results__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.45rem 0.65rem;
+    background: var(--bg-elevated);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.proxy-test-results__list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.3rem;
+}
+
+.proxy-test-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    border-bottom: 1px solid var(--border);
+}
+
+.proxy-test-item:last-child { border-bottom: none; }
+
+.proxy-test-item--ok {
+    color: var(--success);
+}
+
+.proxy-test-item--fail {
+    color: var(--error);
+    opacity: 0.7;
+}
+
+/* ── Button yellow variant ── */
+.btn--yellow {
+    background: var(--yellow);
+    color: var(--bg-dark);
+    font-weight: 700;
+}
+.btn--yellow:hover {
+    background: #ffe066;
+    box-shadow: 0 2px 8px var(--yellow-glow);
+}
+
 /* ── Responsive: Mobile ── */
 @media (max-width: 600px) {
     .header { padding: 0.5rem 0.75rem; }
@@ -1104,4 +1343,5 @@ button:focus-visible {
     .search-box__input { width: 100%; }
     .mode-tabs { font-size: 0.7rem; }
     .mode-tab { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+    .settings-page__scroll { padding: 1rem; }
 }

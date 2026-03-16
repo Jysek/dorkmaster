@@ -36,16 +36,20 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="22" x2="16.65" y2="16.65"/></svg>
                 Hunter
             </button>
+            <button class="mode-tab" data-mode="settings" id="tabSettings">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                Settings
+            </button>
         </div>
 
         <div class="header__stats">
-            <div class="stat-chip">
+            <div class="stat-chip" id="statPossibleChip">
                 <div>
                     <span class="stat-chip__label">Possible</span>
                     <span class="stat-chip__value" id="statPossibleVal">0</span>
                 </div>
             </div>
-            <div class="stat-chip stat-chip--accent">
+            <div class="stat-chip stat-chip--accent" id="statGeneratedChip">
                 <div>
                     <span class="stat-chip__label">Generated</span>
                     <span class="stat-chip__value" id="statGeneratedVal">0</span>
@@ -62,10 +66,8 @@
         <!-- GENERATOR MODE -->
         <!-- =============================== -->
         <div id="modeGenerator" class="mode-content mode-content--active">
-            <!-- Left Panel: Configuration -->
             <aside class="panel panel--config" id="configPanel">
                 <div class="panel__scroll">
-
                     <!-- Search Engine Selector -->
                     <section class="card" id="engineCard">
                         <h2 class="card__title">
@@ -182,7 +184,6 @@
                     </section>
                 </div>
 
-                <!-- Generate Button -->
                 <div class="panel__footer">
                     <button class="btn btn--primary btn--lg btn--full" id="generateBtn">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -191,14 +192,11 @@
                 </div>
             </aside>
 
-            <!-- Resize Handle -->
             <div class="resize-handle" id="resizeHandle" title="Drag to resize">
                 <div class="resize-handle__dots"></div>
             </div>
 
-            <!-- Right Panel: Results -->
             <section class="panel panel--results" id="resultsPanel">
-                <!-- Results Header -->
                 <div class="results-header">
                     <div class="results-header__left">
                         <h2 class="results-header__title">
@@ -217,7 +215,6 @@
                         <button class="btn btn--outline btn--sm btn--icon" id="shuffleBtn" title="Shuffle">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
                         </button>
-                        <!-- Send to Hunter -->
                         <button class="btn btn--green btn--sm btn--icon" id="sendToHunterBtn" title="Send dorks to Hunter" disabled>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             Hunt
@@ -225,10 +222,8 @@
                     </div>
                 </div>
 
-                <!-- Warnings -->
                 <div class="warnings" id="warningsContainer" style="display:none;"></div>
 
-                <!-- Results Area -->
                 <div class="results-body" id="resultsBody">
                     <div class="results-empty" id="resultsEmpty">
                         <div class="results-empty__icon">
@@ -243,7 +238,6 @@
                     <div class="results-list" id="resultsList" style="display:none;"></div>
                 </div>
 
-                <!-- Results Footer -->
                 <div class="results-footer">
                     <div class="results-footer__left">
                         <button class="btn btn--blue btn--sm" id="copyAllBtn" disabled>Copy All</button>
@@ -264,7 +258,6 @@
         <div id="modeHunter" class="mode-content">
             <aside class="panel panel--config" id="hunterConfigPanel">
                 <div class="panel__scroll">
-
                     <!-- Dork Input -->
                     <section class="card">
                         <h2 class="card__title">
@@ -286,13 +279,15 @@
                         </div>
                     </section>
 
-                    <!-- Engine Selection -->
+                    <!-- Free Engines (no API key) -->
                     <section class="card">
                         <h2 class="card__title">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                            Search Engines
+                            Free Engines
+                            <span class="badge badge--free">NO API KEY</span>
                         </h2>
-                        <div class="chip-grid" id="hunterEngineGrid">
+                        <p class="card__hint">These engines scrape search results directly. No API keys needed.</p>
+                        <div class="chip-grid" id="hunterFreeEngineGrid">
                             <button class="chip chip--active" data-engine="duckduckgo">DuckDuckGo</button>
                             <button class="chip chip--active" data-engine="bing">Bing</button>
                             <button class="chip" data-engine="yahoo">Yahoo</button>
@@ -301,10 +296,26 @@
                         </div>
                     </section>
 
+                    <!-- API Engines (require API key) -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            API Engines
+                            <span class="badge badge--api">API KEY</span>
+                        </h2>
+                        <p class="card__hint">These engines use API keys. Configure keys in Settings tab.</p>
+                        <div class="chip-grid" id="hunterApiEngineGrid">
+                            <button class="chip" data-engine="serper" id="serperChip">
+                                Serper.dev (Google)
+                                <span class="chip__status chip__status--no-key" id="serperStatus">No Key</span>
+                            </button>
+                        </div>
+                    </section>
+
                     <!-- Search Options -->
                     <section class="card">
                         <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                             Search Options
                         </h2>
                         <div class="form-group">
@@ -315,6 +326,15 @@
                             <label class="form-label">Max Concurrency</label>
                             <input type="number" class="input input--sm" id="hunterConcurrency" value="3" min="1" max="10">
                         </div>
+                        <div class="form-row">
+                            <label class="toggle">
+                                <input type="checkbox" id="hunterUseProxy">
+                                <span class="toggle__slider"></span>
+                                <span class="toggle__label">Use Proxies</span>
+                                <span class="badge badge--sm" id="proxyCountBadge" style="margin-left:0.3rem;">0</span>
+                            </label>
+                        </div>
+                        <p class="card__hint" id="proxyHint" style="display:none;">Proxy mode enabled. API keys will NOT be used. Configure proxies in Settings.</p>
                     </section>
                 </div>
 
@@ -349,6 +369,17 @@
                     </div>
                 </div>
 
+                <!-- Progress bar for streaming -->
+                <div class="hunt-progress" id="huntProgress" style="display:none;">
+                    <div class="hunt-progress__bar">
+                        <div class="hunt-progress__fill" id="huntProgressFill"></div>
+                    </div>
+                    <div class="hunt-progress__info">
+                        <span id="huntProgressText">Searching...</span>
+                        <span id="huntProgressCount">0 URLs found</span>
+                    </div>
+                </div>
+
                 <div class="results-body" id="hunterResultsBody">
                     <div class="results-empty" id="hunterResultsEmpty">
                         <div class="results-empty__icon">
@@ -373,6 +404,125 @@
                     </div>
                 </div>
             </section>
+        </div>
+
+        <!-- =============================== -->
+        <!-- SETTINGS MODE -->
+        <!-- =============================== -->
+        <div id="modeSettings" class="mode-content">
+            <div class="settings-page">
+                <div class="settings-page__scroll">
+                    <h2 class="settings-page__title">Settings</h2>
+                    <p class="settings-page__desc">Configure API keys, proxies, and other options. Changes are saved per setting.</p>
+
+                    <!-- Current Status -->
+                    <section class="card settings-card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                            Current Status
+                        </h2>
+                        <div class="settings-status" id="settingsStatus">
+                            <div class="settings-status__item">
+                                <span class="settings-status__label">Serper API Keys</span>
+                                <span class="settings-status__value" id="statusSerperKeys">Loading...</span>
+                            </div>
+                            <div class="settings-status__item">
+                                <span class="settings-status__label">Proxy Mode</span>
+                                <span class="settings-status__value" id="statusProxyMode">Loading...</span>
+                            </div>
+                            <div class="settings-status__item">
+                                <span class="settings-status__label">Working Proxies</span>
+                                <span class="settings-status__value" id="statusProxyCount">Loading...</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- API Keys -->
+                    <section class="card settings-card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            API Keys
+                        </h2>
+                        <p class="card__hint">
+                            Enter your Serper.dev API keys (one per line). Get a free key at
+                            <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.
+                            Multiple keys enable rotation on rate limits.
+                        </p>
+                        <div class="form-group">
+                            <label class="form-label">Serper.dev API Keys</label>
+                            <textarea class="textarea" id="settingsSerperKeys" rows="3"
+                                      placeholder="Enter API keys, one per line...&#10;e.g. abc123def456..." spellcheck="false"></textarea>
+                        </div>
+                        <div class="card__actions">
+                            <button class="btn btn--blue btn--sm" id="saveApiKeysBtn">Save API Keys</button>
+                        </div>
+                    </section>
+
+                    <!-- Proxy Configuration -->
+                    <section class="card settings-card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Proxy Configuration
+                        </h2>
+                        <p class="card__hint">
+                            Configure HTTP/SOCKS proxies for scraping. When proxy mode is enabled, API keys are NOT used.
+                            Format: <code>ip:port</code> or <code>http://user:pass@ip:port</code> or <code>socks5://ip:port</code>.
+                        </p>
+                        <div class="form-row" style="margin-bottom:0.6rem;">
+                            <label class="toggle">
+                                <input type="checkbox" id="settingsProxyEnabled">
+                                <span class="toggle__slider"></span>
+                                <span class="toggle__label">Enable Proxy Mode</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Proxy List</label>
+                            <textarea class="textarea" id="settingsProxies" rows="5"
+                                      placeholder="Enter proxies, one per line...&#10;e.g. 123.45.67.89:8080&#10;http://user:pass@proxy.example.com:3128&#10;socks5://127.0.0.1:1080" spellcheck="false"></textarea>
+                        </div>
+                        <div class="card__actions">
+                            <label class="btn btn--outline btn--sm" title="Load proxies from .txt file">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Load from File
+                                <input type="file" id="proxyFileUpload" accept=".txt" hidden>
+                            </label>
+                            <button class="btn btn--yellow btn--sm" id="testProxiesBtn">Test Proxies</button>
+                            <button class="btn btn--blue btn--sm" id="saveProxiesBtn">Save Proxies</button>
+                        </div>
+
+                        <!-- Test Results -->
+                        <div class="proxy-test-results" id="proxyTestResults" style="display:none;">
+                            <div class="proxy-test-results__header">
+                                <span id="proxyTestSummary">Testing...</span>
+                                <button class="btn btn--green btn--sm" id="saveWorkingProxiesBtn" style="display:none;">Save Working Only</button>
+                            </div>
+                            <div class="proxy-test-results__list" id="proxyTestList"></div>
+                        </div>
+                    </section>
+
+                    <!-- Info -->
+                    <section class="card settings-card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            How It Works
+                        </h2>
+                        <div class="settings-info">
+                            <div class="settings-info__item">
+                                <strong>Free Engines</strong> (DuckDuckGo, Bing, Yahoo, Google, Ask.com)
+                                scrape search engine HTML directly. No API keys needed but may get rate-limited.
+                            </div>
+                            <div class="settings-info__item">
+                                <strong>API Engines</strong> (Serper.dev) use paid API keys for reliable access.
+                                Get a free key at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.
+                            </div>
+                            <div class="settings-info__item">
+                                <strong>Proxy Mode</strong> routes all scraping requests through proxies.
+                                When enabled, API keys are NOT used - only free engines with proxies.
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </div>
     </main>
 
