@@ -1,0 +1,17 @@
+# DorkHunter -- Sample Dork Queries
+# One query per line. Lines starting with # are comments.
+#
+# Tip: Use quotes around exact phrases for better results.
+# Tip: Use Google dork operators: inurl:, intitle:, site:, filetype:, etc.
+
+# Example dork queries
+inurl:admin intitle:"login"
+inurl:wp-login.php
+intitle:"index of" "parent directory"
+site:pastebin.com "password"
+filetype:sql "insert into"
+inurl:"/phpmyadmin/" intitle:"phpMyAdmin"
+intitle:"Apache2 Ubuntu Default Page"
+inurl:"/wp-content/uploads/"
+"powered by" "WordPress" inurl:wp-admin
+intitle:"Dashboard" inurl:"/admin/"

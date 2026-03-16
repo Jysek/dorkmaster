@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DorkMaster - Dork Generator & Hunter</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header__brand">
+            <div class="header__logo">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="header__title">DorkMaster</h1>
+                <span class="header__subtitle">Generator & Hunter</span>
+            </div>
+        </div>
+
+        <!-- Mode Tabs -->
+        <div class="mode-tabs">
+            <button class="mode-tab mode-tab--active" data-mode="generator" id="tabGenerator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Generator
+            </button>
+            <button class="mode-tab" data-mode="hunter" id="tabHunter">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="22" x2="16.65" y2="16.65"/></svg>
+                Hunter
+            </button>
+        </div>
+
+        <div class="header__stats">
+            <div class="stat-chip">
+                <div>
+                    <span class="stat-chip__label">Possible</span>
+                    <span class="stat-chip__value" id="statPossibleVal">0</span>
+                </div>
+            </div>
+            <div class="stat-chip stat-chip--accent">
+                <div>
+                    <span class="stat-chip__label">Generated</span>
+                    <span class="stat-chip__value" id="statGeneratedVal">0</span>
+                </div>
+            </div>
+            <div class="header__kbd" title="Ctrl+Enter to run">
+                <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
+            </div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- =============================== -->
+        <!-- GENERATOR MODE -->
+        <!-- =============================== -->
+        <div id="modeGenerator" class="mode-content mode-content--active">
+            <!-- Left Panel: Configuration -->
+            <aside class="panel panel--config" id="configPanel">
+                <div class="panel__scroll">
+
+                    <!-- Search Engine Selector -->
+                    <section class="card" id="engineCard">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                            Search Engine
+                        </h2>
+                        <div class="engine-selector" id="engineSelector">
+                            {% for eid, eng in engines.items() %}
+                            <label class="engine-option{% if eid == 'google' %} engine-option--active{% endif %}" data-engine="{{ eid }}">
+                                <input type="radio" name="engine" value="{{ eid }}" {% if eid == 'google' %}checked{% endif %}>
+                                <span class="engine-option__name">{{ eng.name }}</span>
+                                <span class="engine-option__count">{{ eng.operators|length }} ops</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <!-- Keywords -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                            Keywords
+                            <span class="badge" id="keywordCount">0</span>
+                        </h2>
+                        <p class="card__hint">One keyword per line. Use preset categories to quickly populate.</p>
+                        <textarea class="textarea" id="keywordsInput" rows="5"
+                                  placeholder="login&#10;admin panel&#10;dashboard&#10;config"
+                                  spellcheck="false"></textarea>
+                        <div class="card__actions">
+                            <label class="btn btn--outline btn--sm" title="Upload keywords from .txt file">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload TXT
+                                <input type="file" id="keywordFileUpload" accept=".txt" hidden>
+                            </label>
+                            <button class="btn btn--outline btn--sm" id="clearKeywords" title="Clear all keywords">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                Clear
+                            </button>
+                        </div>
+                        <details class="accordion" id="presetAccordion">
+                            <summary class="accordion__header">Preset Categories</summary>
+                            <div class="accordion__body" id="presetKeywords">
+                                {% for cat_name, cat_keywords in default_keywords.items() %}
+                                <button class="preset-btn" data-keywords="{{ cat_keywords | join('||') }}">
+                                    <span>{{ cat_name }}</span>
+                                    <span class="badge badge--sm">{{ cat_keywords|length }}</span>
+                                </button>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </section>
+
+                    <!-- Operators -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            Operators
+                            <span class="badge" id="operatorCount">0</span>
+                        </h2>
+                        <div class="chip-grid" id="operatorGrid"></div>
+                        <div class="card__actions">
+                            <button class="btn btn--outline btn--sm" id="selectAllOps">Select All</button>
+                            <button class="btn btn--outline btn--sm" id="deselectAllOps">Deselect All</button>
+                        </div>
+                    </section>
+
+                    <!-- Filetypes -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            File Types
+                            <span class="badge" id="filetypeCount">0</span>
+                        </h2>
+                        <div class="chip-grid chip-grid--compact" id="filetypeGrid"></div>
+                        <div class="card__actions">
+                            <button class="btn btn--outline btn--sm" id="selectAllFt">Select All</button>
+                            <button class="btn btn--outline btn--sm" id="deselectAllFt">Deselect All</button>
+                        </div>
+                    </section>
+
+                    <!-- Advanced Options -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            Advanced Options
+                        </h2>
+                        <div class="form-group">
+                            <label class="form-label" for="siteInput">Site Restriction</label>
+                            <input type="text" class="input" id="siteInput" placeholder="example.com" spellcheck="false">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="exclusionsInput">Exclusions (one per line)</label>
+                            <textarea class="textarea textarea--sm" id="exclusionsInput" rows="2"
+                                      placeholder="facebook.com&#10;youtube.com" spellcheck="false"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label class="toggle">
+                                <input type="checkbox" id="useQuotes">
+                                <span class="toggle__slider"></span>
+                                <span class="toggle__label">Exact match (quotes)</span>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label class="toggle">
+                                <input type="checkbox" id="generateAll">
+                                <span class="toggle__slider"></span>
+                                <span class="toggle__label">Generate ALL combinations</span>
+                            </label>
+                        </div>
+                        <div class="form-group" id="maxResultsGroup">
+                            <label class="form-label" for="maxResults">Max Results <span class="form-label__hint">(0 = all)</span></label>
+                            <input type="number" class="input input--sm" id="maxResults" value="100" min="0" step="1">
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Generate Button -->
+                <div class="panel__footer">
+                    <button class="btn btn--primary btn--lg btn--full" id="generateBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        Generate Dorks
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Resize Handle -->
+            <div class="resize-handle" id="resizeHandle" title="Drag to resize">
+                <div class="resize-handle__dots"></div>
+            </div>
+
+            <!-- Right Panel: Results -->
+            <section class="panel panel--results" id="resultsPanel">
+                <!-- Results Header -->
+                <div class="results-header">
+                    <div class="results-header__left">
+                        <h2 class="results-header__title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                            Generated Dorks
+                        </h2>
+                        <span class="results-header__count" id="resultCount">0 dorks</span>
+                    </div>
+                    <div class="results-header__actions">
+                        <div class="search-box">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" class="search-box__input" id="searchInput" placeholder="Filter results..." spellcheck="false">
+                            <button class="search-box__clear" id="searchClear" title="Clear filter" style="display:none;">&times;</button>
+                        </div>
+                        <button class="btn btn--outline btn--sm btn--icon" id="sortBtn" title="Sort A-Z">A-Z</button>
+                        <button class="btn btn--outline btn--sm btn--icon" id="shuffleBtn" title="Shuffle">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                        </button>
+                        <!-- Send to Hunter -->
+                        <button class="btn btn--green btn--sm btn--icon" id="sendToHunterBtn" title="Send dorks to Hunter" disabled>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Hunt
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Warnings -->
+                <div class="warnings" id="warningsContainer" style="display:none;"></div>
+
+                <!-- Results Area -->
+                <div class="results-body" id="resultsBody">
+                    <div class="results-empty" id="resultsEmpty">
+                        <div class="results-empty__icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
+                            </svg>
+                        </div>
+                        <h3>No Dorks Generated Yet</h3>
+                        <p>Configure your options on the left and click <strong>Generate Dorks</strong> or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.</p>
+                    </div>
+                    <div class="results-list" id="resultsList" style="display:none;"></div>
+                </div>
+
+                <!-- Results Footer -->
+                <div class="results-footer">
+                    <div class="results-footer__left">
+                        <button class="btn btn--blue btn--sm" id="copyAllBtn" disabled>Copy All</button>
+                        <button class="btn btn--blue btn--sm" id="copySelectedBtn" disabled>Copy Selected</button>
+                    </div>
+                    <div class="results-footer__right">
+                        <button class="btn btn--green btn--sm" id="exportTxtBtn" disabled>TXT</button>
+                        <button class="btn btn--green btn--sm" id="exportCsvBtn" disabled>CSV</button>
+                        <button class="btn btn--green btn--sm" id="exportJsonBtn" disabled>JSON</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- =============================== -->
+        <!-- HUNTER MODE -->
+        <!-- =============================== -->
+        <div id="modeHunter" class="mode-content">
+            <aside class="panel panel--config" id="hunterConfigPanel">
+                <div class="panel__scroll">
+
+                    <!-- Dork Input -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Dork Queries
+                            <span class="badge" id="hunterDorkCount">0</span>
+                        </h2>
+                        <p class="card__hint">Enter dork queries to search (one per line). Or use the Generator to create them first.</p>
+                        <textarea class="textarea" id="hunterDorksInput" rows="8"
+                                  placeholder='inurl:admin intitle:"login"&#10;intitle:"index of" "parent directory"&#10;site:example.com filetype:pdf'
+                                  spellcheck="false"></textarea>
+                        <div class="card__actions">
+                            <label class="btn btn--outline btn--sm" title="Upload dorks from .txt file">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload TXT
+                                <input type="file" id="hunterFileUpload" accept=".txt" hidden>
+                            </label>
+                            <button class="btn btn--outline btn--sm" id="hunterClearDorks">Clear</button>
+                        </div>
+                    </section>
+
+                    <!-- Engine Selection -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                            Search Engines
+                        </h2>
+                        <div class="chip-grid" id="hunterEngineGrid">
+                            <button class="chip chip--active" data-engine="duckduckgo">DuckDuckGo</button>
+                            <button class="chip chip--active" data-engine="bing">Bing</button>
+                            <button class="chip" data-engine="yahoo">Yahoo</button>
+                            <button class="chip" data-engine="google">Google</button>
+                            <button class="chip" data-engine="ask">Ask.com</button>
+                        </div>
+                    </section>
+
+                    <!-- Search Options -->
+                    <section class="card">
+                        <h2 class="card__title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            Search Options
+                        </h2>
+                        <div class="form-group">
+                            <label class="form-label">Pages per Dork</label>
+                            <input type="number" class="input input--sm" id="hunterPages" value="1" min="1" max="5">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Max Concurrency</label>
+                            <input type="number" class="input input--sm" id="hunterConcurrency" value="3" min="1" max="10">
+                        </div>
+                    </section>
+                </div>
+
+                <div class="panel__footer">
+                    <button class="btn btn--primary btn--lg btn--full" id="hunterSearchBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        Start Hunting
+                    </button>
+                </div>
+            </aside>
+
+            <div class="resize-handle" id="hunterResizeHandle" title="Drag to resize">
+                <div class="resize-handle__dots"></div>
+            </div>
+
+            <!-- Hunter Results -->
+            <section class="panel panel--results" id="hunterResultsPanel">
+                <div class="results-header">
+                    <div class="results-header__left">
+                        <h2 class="results-header__title">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                            Extracted URLs
+                        </h2>
+                        <span class="results-header__count" id="hunterUrlCount">0 URLs</span>
+                    </div>
+                    <div class="results-header__actions">
+                        <div class="search-box">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" class="search-box__input" id="hunterSearchInput" placeholder="Filter URLs..." spellcheck="false">
+                            <button class="search-box__clear" id="hunterSearchClear" title="Clear filter" style="display:none;">&times;</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-body" id="hunterResultsBody">
+                    <div class="results-empty" id="hunterResultsEmpty">
+                        <div class="results-empty__icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                        </div>
+                        <h3>No URLs Extracted Yet</h3>
+                        <p>Enter dork queries and click <strong>Start Hunting</strong> to extract URLs from search engines.</p>
+                    </div>
+                    <div class="results-list" id="hunterResultsList" style="display:none;"></div>
+                </div>
+
+                <div class="results-footer">
+                    <div class="results-footer__left">
+                        <button class="btn btn--blue btn--sm" id="hunterCopyAllBtn" disabled>Copy All URLs</button>
+                    </div>
+                    <div class="results-footer__right">
+                        <button class="btn btn--green btn--sm" id="hunterExportTxtBtn" disabled>TXT</button>
+                        <button class="btn btn--green btn--sm" id="hunterExportCsvBtn" disabled>CSV</button>
+                        <button class="btn btn--green btn--sm" id="hunterExportJsonBtn" disabled>JSON</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing...</p>
+            <span class="loading-spinner__sub" id="loadingSubtext">This may take a moment</span>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

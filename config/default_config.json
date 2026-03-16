@@ -1,0 +1,370 @@
+{
+  "search_engines": {
+    "google": {
+      "name": "Google",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "allintitle": { "syntax": "allintitle:{value}", "description": "Title contains ALL terms" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "allinurl": { "syntax": "allinurl:{value}", "description": "URL contains ALL terms" },
+        "intext": { "syntax": "intext:{value}", "description": "Body text contains term" },
+        "allintext": { "syntax": "allintext:{value}", "description": "Body contains ALL terms" },
+        "filetype": { "syntax": "filetype:{value}", "description": "Specific file extension" },
+        "ext": { "syntax": "ext:{value}", "description": "File extension (alias for filetype)" },
+        "cache": { "syntax": "cache:{value}", "description": "Google cached version of URL" },
+        "related": { "syntax": "related:{value}", "description": "Pages similar to URL" },
+        "info": { "syntax": "info:{value}", "description": "Info about URL" },
+        "define": { "syntax": "define:{value}", "description": "Definition of a term" },
+        "inanchor": { "syntax": "inanchor:{value}", "description": "Anchor text contains term" },
+        "allinanchor": { "syntax": "allinanchor:{value}", "description": "Anchor text contains ALL terms" },
+        "before": { "syntax": "before:{value}", "description": "Results before date (YYYY-MM-DD)" },
+        "after": { "syntax": "after:{value}", "description": "Results after date (YYYY-MM-DD)" },
+        "numrange": { "syntax": "numrange:{value}", "description": "Number range (e.g. 100..200)" },
+        "source": { "syntax": "source:{value}", "description": "News source in Google News" },
+        "loc": { "syntax": "loc:{value}", "description": "Location in Google News" },
+        "weather": { "syntax": "weather:{value}", "description": "Weather for a location" },
+        "stocks": { "syntax": "stocks:{value}", "description": "Stock info for ticker" },
+        "map": { "syntax": "map:{value}", "description": "Map results for location" }
+      },
+      "boolean_operators": {
+        "AND": " ",
+        "OR": " OR ",
+        "NOT": " -",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": "*",
+        "GROUP": "({value})",
+        "AROUND": "AROUND({value})"
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "php", "asp", "aspx", "jsp", "html", "htm", "shtml",
+        "sql", "csv", "log", "txt", "bak", "db", "mdb", "sqlite",
+        "conf", "cfg", "ini", "yml", "yaml", "env", "xml", "json",
+        "zip", "tar", "gz", "rar", "7z", "bz2",
+        "odt", "rtf", "properties", "toml",
+        "py", "rb", "pl", "cgi", "sh", "bat", "ps1",
+        "java", "class", "jar", "war",
+        "key", "pem", "crt", "cer", "csr", "p12", "pfx",
+        "swf", "action", "do",
+        "inc", "bkf", "bkp", "old", "orig", "temp", "tmp",
+        "wsdl", "asmx", "wadl", "svc",
+        "rdp", "ovpn", "pcap",
+        "eml", "msg", "mbox", "pst",
+        "kdb", "kdbx", "kwallet", "dat"
+      ]
+    },
+    "bing": {
+      "name": "Bing",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "inbody": { "syntax": "inbody:{value}", "description": "Body text contains term" },
+        "inanchor": { "syntax": "inanchor:{value}", "description": "Anchor text contains term" },
+        "filetype": { "syntax": "filetype:{value}", "description": "Specific file extension" },
+        "feed": { "syntax": "feed:{value}", "description": "RSS/Atom feeds for a topic" },
+        "hasfeed": { "syntax": "hasfeed:{value}", "description": "Pages with RSS/Atom feeds" },
+        "contains": { "syntax": "contains:{value}", "description": "Page contains links to file type" },
+        "ip": { "syntax": "ip:{value}", "description": "Pages hosted on IP address" },
+        "language": { "syntax": "language:{value}", "description": "Page language code" },
+        "location": { "syntax": "location:{value}", "description": "Country/region of results" },
+        "prefer": { "syntax": "prefer:{value}", "description": "Prefer results with term" },
+        "url": { "syntax": "url:{value}", "description": "Exact URL match" },
+        "near": { "syntax": "near:{value}", "description": "Results near a location" },
+        "linkfromdomain": { "syntax": "linkfromdomain:{value}", "description": "Links from a domain" }
+      },
+      "boolean_operators": {
+        "AND": " AND ",
+        "OR": " OR ",
+        "NOT": " NOT ",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": "*",
+        "GROUP": "({value})",
+        "NEAR": "NEAR:{value}"
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "php", "asp", "aspx", "html", "htm",
+        "txt", "csv", "xml", "json", "log",
+        "sql", "bak", "conf", "cfg", "ini", "env",
+        "zip", "tar", "gz",
+        "py", "rb", "pl", "cgi", "sh",
+        "java", "class", "jar",
+        "key", "pem", "crt",
+        "rdp", "ovpn", "dat"
+      ]
+    },
+    "duckduckgo": {
+      "name": "DuckDuckGo",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "inbody": { "syntax": "inbody:{value}", "description": "Body text contains term" },
+        "filetype": { "syntax": "filetype:{value}", "description": "Specific file extension" }
+      },
+      "boolean_operators": {
+        "AND": " ",
+        "OR": " OR ",
+        "NOT": " -",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": null,
+        "GROUP": null
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "html", "htm", "xml", "txt", "csv", "json",
+        "php", "asp", "aspx", "log",
+        "sql", "bak", "conf", "cfg", "ini", "env",
+        "key", "pem", "crt"
+      ]
+    },
+    "yahoo": {
+      "name": "Yahoo",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "intext": { "syntax": "intext:{value}", "description": "Body text contains term" },
+        "filetype": { "syntax": "filetype:{value}", "description": "Specific file extension (via Bing)" },
+        "hostname": { "syntax": "hostname:{value}", "description": "Specific hostname" },
+        "inbody": { "syntax": "inbody:{value}", "description": "Body text contains term (via Bing)" },
+        "link": { "syntax": "link:{value}", "description": "Pages linking to URL" }
+      },
+      "boolean_operators": {
+        "AND": " AND ",
+        "OR": " OR ",
+        "NOT": " -",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": "*",
+        "GROUP": "({value})"
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "php", "asp", "aspx", "html", "htm",
+        "txt", "csv", "xml", "json", "log",
+        "sql", "bak", "conf", "cfg", "ini", "env",
+        "key", "pem", "crt", "dat"
+      ]
+    },
+    "yandex": {
+      "name": "Yandex",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "intext": { "syntax": "intext:{value}", "description": "Body text contains term" },
+        "mime": { "syntax": "mime:{value}", "description": "File type (MIME-based)" },
+        "host": { "syntax": "host:{value}", "description": "Specific host" },
+        "rhost": { "syntax": "rhost:{value}", "description": "Reverse host (e.g. com.example.*)" },
+        "domain": { "syntax": "domain:{value}", "description": "Restrict to domain zone" },
+        "date": { "syntax": "date:{value}", "description": "Date filter (YYYYMMDD or range)" },
+        "lang": { "syntax": "lang:{value}", "description": "Language filter (en, ru, etc.)" },
+        "cat": { "syntax": "cat:{value}", "description": "Category ID filter" }
+      },
+      "boolean_operators": {
+        "AND": " && ",
+        "OR": " | ",
+        "NOT": " ~~",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": "*",
+        "GROUP": "({value})"
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "rtf", "odt", "ods", "odp",
+        "html", "htm", "xml", "txt", "csv", "json",
+        "php", "asp", "aspx",
+        "sql", "bak", "conf", "cfg", "ini", "env", "log",
+        "key", "pem", "crt", "dat"
+      ]
+    },
+    "baidu": {
+      "name": "Baidu",
+      "operators": {
+        "site": { "syntax": "site:{value}", "description": "Restrict to specific domain" },
+        "intitle": { "syntax": "intitle:{value}", "description": "Page title contains term" },
+        "inurl": { "syntax": "inurl:{value}", "description": "URL contains term" },
+        "filetype": { "syntax": "filetype:{value}", "description": "Specific file extension" }
+      },
+      "boolean_operators": {
+        "AND": " ",
+        "OR": " | ",
+        "NOT": " -",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": null,
+        "GROUP": "({value})"
+      },
+      "filetype_list": [
+        "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+        "rtf", "txt", "html", "htm", "xml",
+        "all"
+      ]
+    },
+    "shodan": {
+      "name": "Shodan",
+      "operators": {
+        "hostname": { "syntax": "hostname:{value}", "description": "Search by hostname" },
+        "port": { "syntax": "port:{value}", "description": "Filter by port number" },
+        "os": { "syntax": "os:{value}", "description": "Operating system filter" },
+        "city": { "syntax": "city:{value}", "description": "City filter" },
+        "country": { "syntax": "country:{value}", "description": "Country code (e.g. US, DE)" },
+        "org": { "syntax": "org:{value}", "description": "Organization name" },
+        "isp": { "syntax": "isp:{value}", "description": "ISP name" },
+        "net": { "syntax": "net:{value}", "description": "CIDR network range" },
+        "product": { "syntax": "product:{value}", "description": "Product name (e.g. Apache)" },
+        "version": { "syntax": "version:{value}", "description": "Software version" },
+        "http.title": { "syntax": "http.title:{value}", "description": "HTTP page title" },
+        "http.status": { "syntax": "http.status:{value}", "description": "HTTP status code" },
+        "http.html": { "syntax": "http.html:{value}", "description": "HTML body content" },
+        "http.component": { "syntax": "http.component:{value}", "description": "Web component/technology" },
+        "ssl": { "syntax": "ssl:{value}", "description": "SSL certificate text" },
+        "ssl.cert.subject.cn": { "syntax": "ssl.cert.subject.cn:{value}", "description": "SSL cert common name" },
+        "ssl.cert.issuer.cn": { "syntax": "ssl.cert.issuer.cn:{value}", "description": "SSL cert issuer" },
+        "ssl.cert.expired": { "syntax": "ssl.cert.expired:{value}", "description": "Expired SSL certs (true/false)" },
+        "has_screenshot": { "syntax": "has_screenshot:{value}", "description": "Has screenshot (true)" },
+        "vuln": { "syntax": "vuln:{value}", "description": "Known vulnerability CVE" },
+        "tag": { "syntax": "tag:{value}", "description": "Shodan tag filter" },
+        "before": { "syntax": "before:{value}", "description": "Results before date" },
+        "after": { "syntax": "after:{value}", "description": "Results after date" },
+        "asn": { "syntax": "asn:{value}", "description": "ASN number" },
+        "http.favicon.hash": { "syntax": "http.favicon.hash:{value}", "description": "Favicon hash" }
+      },
+      "boolean_operators": {
+        "AND": " ",
+        "OR": ",",
+        "NOT": " -",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": null,
+        "GROUP": null
+      },
+      "filetype_list": []
+    },
+    "github": {
+      "name": "GitHub",
+      "operators": {
+        "in:name": { "syntax": "in:name {value}", "description": "Search in repo name" },
+        "in:description": { "syntax": "in:description {value}", "description": "Search in repo description" },
+        "in:readme": { "syntax": "in:readme {value}", "description": "Search in README" },
+        "in:file": { "syntax": "in:file {value}", "description": "Search in file contents" },
+        "in:path": { "syntax": "in:path {value}", "description": "Search in file path" },
+        "user": { "syntax": "user:{value}", "description": "Filter by user/org" },
+        "org": { "syntax": "org:{value}", "description": "Filter by organization" },
+        "repo": { "syntax": "repo:{value}", "description": "Filter by repository" },
+        "language": { "syntax": "language:{value}", "description": "Programming language" },
+        "filename": { "syntax": "filename:{value}", "description": "Search by filename" },
+        "extension": { "syntax": "extension:{value}", "description": "File extension filter" },
+        "path": { "syntax": "path:{value}", "description": "File path filter" },
+        "size": { "syntax": "size:{value}", "description": "File size filter (e.g. >1000)" },
+        "stars": { "syntax": "stars:{value}", "description": "Star count (e.g. >100)" },
+        "forks": { "syntax": "forks:{value}", "description": "Fork count (e.g. >50)" },
+        "created": { "syntax": "created:{value}", "description": "Creation date filter" },
+        "pushed": { "syntax": "pushed:{value}", "description": "Last push date filter" }
+      },
+      "boolean_operators": {
+        "AND": " ",
+        "OR": " OR ",
+        "NOT": " NOT ",
+        "EXACT": "\"{value}\"",
+        "WILDCARD": null,
+        "GROUP": null
+      },
+      "filetype_list": [
+        "py", "js", "ts", "rb", "php", "java", "go", "rs", "c", "cpp", "h",
+        "yml", "yaml", "json", "xml", "toml", "ini", "cfg", "conf", "env",
+        "sh", "bash", "bat", "ps1",
+        "sql", "md", "txt", "csv", "log",
+        "html", "htm", "css",
+        "dockerfile", "tf", "hcl",
+        "key", "pem", "crt", "cer"
+      ]
+    }
+  },
+  "default_keywords": {
+    "Credentials": [
+      "login", "password", "username", "admin", "auth",
+      "credential", "passwd", "secret", "token", "api_key",
+      "apikey", "access_token", "private_key", "ssh_key",
+      "authorization", "oauth", "jwt", "session_id",
+      "master_password", "root_password", "db_password",
+      "aws_secret", "azure_key", "gcp_key"
+    ],
+    "Documents & Data": [
+      "confidential", "internal", "private", "restricted",
+      "budget", "salary", "invoice", "report", "backup",
+      "database", "dump", "export", "spreadsheet",
+      "financial", "payroll", "contract", "agreement",
+      "sensitive", "classified", "proprietary", "draft",
+      "employee list", "customer data", "personal data"
+    ],
+    "Infrastructure": [
+      "dashboard", "admin panel", "control panel", "cpanel",
+      "phpmyadmin", "webmail", "server-status", "server-info",
+      "index of", "parent directory", "directory listing",
+      "wp-admin", "wp-login", "administrator", "webadmin",
+      "grafana", "kibana", "jenkins", "gitlab", "jira",
+      "nagios", "zabbix", "prometheus", "portainer",
+      "phpinfo", "test page", "default page",
+      "tomcat manager", "weblogic console", "jboss console"
+    ],
+    "Configuration": [
+      "config", "configuration", "setup", "install",
+      "env", ".env", "wp-config", "database.yml",
+      "settings", "application.properties",
+      ".htaccess", ".htpasswd", "web.config", "robots.txt",
+      "docker-compose", "dockerfile", "ansible",
+      "terraform", "cloudformation", "kubernetes",
+      "nginx.conf", "apache.conf", "httpd.conf",
+      "my.cnf", "pg_hba.conf", "redis.conf",
+      "credentials.xml", "settings.xml", "pom.xml"
+    ],
+    "Error Pages": [
+      "error", "warning", "exception", "stack trace",
+      "debug", "traceback", "fatal error", "syntax error",
+      "mysql error", "sql syntax",
+      "500 internal server error", "404 not found",
+      "403 forbidden", "401 unauthorized",
+      "php warning", "php notice", "php fatal",
+      "undefined variable", "null pointer",
+      "connection refused", "access denied"
+    ],
+    "Vulnerable Pages": [
+      "inurl:admin", "inurl:login", "inurl:portal",
+      "index of /backup", "index of /private",
+      "index of /upload", "index of /tmp", "index of /logs",
+      "index of /.git", "index of /.svn", "index of /.env",
+      "powered by", "running on", "version",
+      "phpMyAdmin", "cgi-bin", "wp-content/uploads",
+      "shell", "cmd", "exec", "eval"
+    ],
+    "IoT & Devices": [
+      "webcam", "camera", "ip camera", "network camera",
+      "printer", "router", "switch", "modem",
+      "scada", "plc", "hmi", "ics",
+      "smart home", "thermostat", "dvr", "nvr",
+      "voip", "pbx", "sip",
+      "default password", "admin admin", "admin password"
+    ],
+    "Cloud & APIs": [
+      "s3.amazonaws.com", "blob.core.windows.net",
+      "storage.googleapis.com", "firebase",
+      "api key", "client_id", "client_secret",
+      "swagger", "openapi", "graphql",
+      "api/v1", "api/v2", "rest/api",
+      ".json", "endpoint", "webhook",
+      "postman_collection", "insomnia"
+    ]
+  },
+  "generation_rules": {
+    "mutually_exclusive": [
+      ["filetype", "ext"],
+      ["intitle", "allintitle"],
+      ["inurl", "allinurl"],
+      ["intext", "allintext"],
+      ["filetype", "mime"]
+    ],
+    "max_operators_per_dork": 5,
+    "max_dork_length": 512
+  }
+}
