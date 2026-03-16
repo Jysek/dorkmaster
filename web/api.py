@@ -2,21 +2,35 @@
 DorkMaster Web - API Routes
 ===============================
 
-Handles JSON API endpoints for generator, hunter, export,
-and combination counting.
+Handles JSON API endpoints for:
+  - Generator: dork generation, counting, export
+  - Hunter: search with real-time streaming (SSE), export
+  - Settings: API keys, proxies, configuration
 """
 
 import asyncio
 import csv
 import io
 import json
+import time
 
-from flask import Blueprint, Response, jsonify, request
+import httpx
+from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from core.engine import DorkConfig, DorkGenerator
-from hunter.config import HunterConfig
+from hunter.config import (
+    HunterConfig,
+    get_hunter_config,
+    save_settings,
+    get_current_settings,
+    FREE_ENGINES,
+    API_ENGINES,
+    FREE_ENGINE_INFO,
+    _load_persisted_settings,
+)
 from hunter.search.free_engine import FreeSearchEngine, AVAILABLE_ENGINES
-from hunter.reporting.exporter import export_txt, export_json, export_csv
+from hunter.search.engine import SearchEngine
+from hunter.search.key_manager import KeyManager, KeyExhaustedError
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -39,9 +53,9 @@ def _get_generator() -> DorkGenerator:
     return _generator
 
 
-# ----------------------------------------------------------------
+# ================================================================
 # Generator API
-# ----------------------------------------------------------------
+# ================================================================
 
 @api_bp.route("/config")
 def get_config():
@@ -188,26 +202,23 @@ def export():
     return jsonify({"error": f"Unknown format: {fmt}"}), 400
 
 
-# ----------------------------------------------------------------
+# ================================================================
 # Hunter API
-# ----------------------------------------------------------------
+# ================================================================
 
 @api_bp.route("/hunter/engines")
 def hunter_engines():
-    """Return available search engines for the hunter."""
-    engine_info = {
-        "duckduckgo": {"name": "DuckDuckGo", "desc": "Most reliable, no JS needed"},
-        "bing": {"name": "Bing", "desc": "Good results, fast"},
-        "yahoo": {"name": "Yahoo", "desc": "Decent coverage"},
-        "google": {"name": "Google", "desc": "Best results but may block scrapers"},
-        "ask": {"name": "Ask.com", "desc": "Extra coverage"},
-    }
-    return jsonify({"engines": engine_info, "available": AVAILABLE_ENGINES})
+    """Return available search engines for the hunter, classified by type."""
+    return jsonify({
+        "free_engines": FREE_ENGINE_INFO,
+        "api_engines": API_ENGINES,
+        "available_free": FREE_ENGINES,
+    })
 
 
 @api_bp.route("/hunter/search", methods=["POST"])
 def hunter_search():
-    """Execute dork hunting -- search dorks and extract URLs."""
+    """Execute dork hunting and return results (non-streaming)."""
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No JSON data provided."}), 400
@@ -222,6 +233,7 @@ def hunter_search():
     engines = data.get("engines", ["duckduckgo", "bing"])
     pages = data.get("pages_per_dork", 1)
     max_conc = data.get("max_concurrency", 3)
+    use_proxy = data.get("use_proxy", False)
 
     # Validate engines
     valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
@@ -235,11 +247,18 @@ def hunter_search():
         pages = 1
         max_conc = 3
 
+    # Get proxies if enabled
+    proxies = []
+    if use_proxy:
+        cfg = get_hunter_config()
+        proxies = cfg.proxy.proxies if cfg.proxy.enabled else []
+
     # Run search
     search_engine = FreeSearchEngine(
         queries=dorks,
         engines=valid_engines,
         pages_per_dork=pages,
+        proxies=proxies,
     )
 
     loop = asyncio.new_event_loop()
@@ -256,6 +275,140 @@ def hunter_search():
         "dorks_processed": len(dorks),
         "engines_used": valid_engines,
     })
+
+
+@api_bp.route("/hunter/search/stream", methods=["POST"])
+def hunter_search_stream():
+    """Execute dork hunting with Server-Sent Events (SSE) for real-time results.
+
+    Returns an SSE stream with events:
+      - url: {url}           -- each new unique URL found
+      - progress: {json}     -- progress update with counts
+      - done: {json}         -- final summary
+      - error: {message}     -- error message
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No JSON data provided."}), 400
+
+    dorks = data.get("dorks", [])
+    if isinstance(dorks, str):
+        dorks = [d.strip() for d in dorks.split("\n") if d.strip()]
+
+    if not dorks:
+        return jsonify({"error": "No dorks provided."}), 400
+
+    engines = data.get("engines", ["duckduckgo", "bing"])
+    pages = data.get("pages_per_dork", 1)
+    max_conc = data.get("max_concurrency", 3)
+    use_proxy = data.get("use_proxy", False)
+
+    valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
+    if not valid_engines:
+        valid_engines = ["duckduckgo", "bing"]
+
+    try:
+        pages = max(1, min(5, int(pages)))
+        max_conc = max(1, min(10, int(max_conc)))
+    except (ValueError, TypeError):
+        pages = 1
+        max_conc = 3
+
+    # Get proxies if enabled
+    proxies = []
+    if use_proxy:
+        cfg = get_hunter_config()
+        proxies = cfg.proxy.proxies if cfg.proxy.enabled else []
+
+    def generate_events():
+        """Generator that yields SSE events."""
+        all_urls = []
+        completed = [0]
+        total = len(dorks) * len(valid_engines) * pages
+
+        def on_urls(new_urls):
+            all_urls.extend(new_urls)
+
+        search_engine = FreeSearchEngine(
+            queries=dorks,
+            engines=valid_engines,
+            pages_per_dork=pages,
+            proxies=proxies,
+        )
+
+        loop = asyncio.new_event_loop()
+
+        try:
+            # We need to run the async search and yield results.
+            # Use a queue to communicate between async and sync code.
+            import queue
+            import threading
+
+            result_queue = queue.Queue()
+
+            def on_results_callback(new_urls):
+                for url in new_urls:
+                    result_queue.put(("url", url))
+                result_queue.put(("progress", {
+                    "total_urls": search_engine.discovered_count,
+                }))
+
+            def run_search():
+                try:
+                    loop.run_until_complete(
+                        search_engine.search_all(
+                            on_results=on_results_callback,
+                            max_concurrency=max_conc,
+                        )
+                    )
+                    result_queue.put(("done", {
+                        "total_urls": search_engine.discovered_count,
+                        "dorks_processed": len(dorks),
+                        "engines_used": valid_engines,
+                    }))
+                except Exception as exc:
+                    result_queue.put(("error", str(exc)))
+                finally:
+                    result_queue.put(None)  # Sentinel
+                    loop.close()
+
+            thread = threading.Thread(target=run_search, daemon=True)
+            thread.start()
+
+            while True:
+                try:
+                    item = result_queue.get(timeout=120)
+                except queue.Empty:
+                    yield "event: error\ndata: Timeout waiting for results\n\n"
+                    break
+
+                if item is None:
+                    break
+
+                event_type, event_data = item
+                if event_type == "url":
+                    yield f"event: url\ndata: {json.dumps({'url': event_data})}\n\n"
+                elif event_type == "progress":
+                    yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
+                elif event_type == "done":
+                    yield f"event: done\ndata: {json.dumps(event_data)}\n\n"
+                elif event_type == "error":
+                    yield f"event: error\ndata: {json.dumps({'error': event_data})}\n\n"
+
+            thread.join(timeout=5)
+
+        except Exception as exc:
+            yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
+
+    return Response(
+        stream_with_context(generate_events()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @api_bp.route("/hunter/export", methods=["POST"])
@@ -312,3 +465,142 @@ def hunter_export():
         )
 
     return jsonify({"error": f"Unknown format: {fmt}"}), 400
+
+
+# ================================================================
+# Settings API
+# ================================================================
+
+@api_bp.route("/settings", methods=["GET"])
+def get_settings():
+    """Return current settings for display."""
+    return jsonify(get_current_settings())
+
+
+@api_bp.route("/settings/api-keys", methods=["POST"])
+def save_api_keys():
+    """Save API keys."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    persisted = _load_persisted_settings()
+
+    serper_keys = data.get("serper_api_keys", [])
+    if isinstance(serper_keys, str):
+        serper_keys = [k.strip() for k in serper_keys.split(",") if k.strip()]
+
+    persisted["serper_api_keys"] = serper_keys
+    save_settings(persisted)
+
+    return jsonify({
+        "status": "ok",
+        "message": f"Saved {len(serper_keys)} Serper API key(s).",
+        "count": len(serper_keys),
+    })
+
+
+@api_bp.route("/settings/proxies", methods=["POST"])
+def save_proxies():
+    """Save proxy list."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    persisted = _load_persisted_settings()
+
+    proxies = data.get("proxies", [])
+    if isinstance(proxies, str):
+        proxies = [p.strip() for p in proxies.split("\n") if p.strip()]
+
+    enabled = data.get("enabled", False)
+
+    persisted["proxies"] = proxies
+    persisted["proxy_enabled"] = enabled
+    save_settings(persisted)
+
+    return jsonify({
+        "status": "ok",
+        "message": f"Saved {len(proxies)} proxies. Proxy mode: {'enabled' if enabled else 'disabled'}.",
+        "count": len(proxies),
+        "enabled": enabled,
+    })
+
+
+@api_bp.route("/settings/proxies/test", methods=["POST"])
+def test_proxies():
+    """Test a list of proxies and return only the working ones."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    proxies = data.get("proxies", [])
+    if isinstance(proxies, str):
+        proxies = [p.strip() for p in proxies.split("\n") if p.strip()]
+
+    if not proxies:
+        return jsonify({"error": "No proxies to test."}), 400
+
+    timeout = data.get("timeout", 10)
+    test_url = "https://httpbin.org/ip"
+
+    working = []
+    failed = []
+
+    loop = asyncio.new_event_loop()
+    try:
+        async def test_all():
+            sem = asyncio.Semaphore(10)
+
+            async def test_one(proxy_str: str):
+                async with sem:
+                    p = proxy_str.strip()
+                    if not p.startswith("http://") and not p.startswith("https://") and not p.startswith("socks"):
+                        p = "http://" + p
+
+                    try:
+                        async with httpx.AsyncClient(
+                            proxy=p,
+                            timeout=timeout,
+                            verify=False,
+                        ) as client:
+                            resp = await client.get(test_url)
+                            if resp.status_code == 200:
+                                working.append(proxy_str)
+                            else:
+                                failed.append(proxy_str)
+                    except Exception:
+                        failed.append(proxy_str)
+
+            await asyncio.gather(*[test_one(p) for p in proxies])
+
+        loop.run_until_complete(test_all())
+    finally:
+        loop.close()
+
+    return jsonify({
+        "working": working,
+        "failed": failed,
+        "total_tested": len(proxies),
+        "total_working": len(working),
+    })
+
+
+@api_bp.route("/settings/proxies/save-working", methods=["POST"])
+def save_working_proxies():
+    """Save only the working proxies from a test."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided."}), 400
+
+    working = data.get("working", [])
+    persisted = _load_persisted_settings()
+    persisted["proxies"] = working
+    persisted["proxy_enabled"] = len(working) > 0
+    save_settings(persisted)
+
+    return jsonify({
+        "status": "ok",
+        "message": f"Saved {len(working)} working proxies.",
+        "count": len(working),
+    })
