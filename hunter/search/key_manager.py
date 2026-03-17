@@ -17,12 +17,12 @@ class KeyManager:
     """Manages a pool of Serper.dev API keys with auto-rotation."""
 
     def __init__(self, keys: list[str]) -> None:
-        if not keys:
+        self._keys = [k for k in keys if k and k.strip()]
+        if not self._keys:
             raise ValueError(
                 "At least one Serper.dev API key is required. "
                 "Set SERPER_API_KEYS env var (comma-separated)."
             )
-        self._keys = list(keys)
         self._index = 0
         self._dead_keys: set[str] = set()
 
@@ -30,6 +30,11 @@ class KeyManager:
     def current_key(self) -> str:
         if self._all_exhausted():
             raise KeyExhaustedError("All Serper.dev API keys have been exhausted.")
+        # Skip dead keys
+        while self._keys[self._index] in self._dead_keys:
+            self._index = (self._index + 1) % len(self._keys)
+            if self._all_exhausted():
+                raise KeyExhaustedError("All Serper.dev API keys have been exhausted.")
         return self._keys[self._index]
 
     def rotate(self, reason: str = "") -> str:
@@ -46,7 +51,7 @@ class KeyManager:
         raise KeyExhaustedError("All Serper.dev API keys have been exhausted.")
 
     def mark_success(self) -> None:
-        pass
+        """Mark current key as successful (no-op for now, future extension)."""
 
     def _all_exhausted(self) -> bool:
         return len(self._dead_keys) >= len(self._keys)

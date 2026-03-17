@@ -1,14 +1,14 @@
 /**
- * DorkMaster v5 — Unified Frontend
+ * DorkMaster v6 -- Unified Frontend
  * Generator + Hunter + Scanner + Settings
+ * Supports: vuln_params, free/api/proxy modes, scanner proxy
  */
 (function(){
 'use strict';
 
-const CHUNK=5000, ROW_H=30, OVERSCAN=15;
 let currentEngine='google', allDorks=[], filteredDorks=[], selectedRows=new Set();
-let engineConfig=null, sortAsc=true, useVirtual=false;
-let huntUrls=[], huntFiltered=[], isHunting=false;
+let engineConfig=null, sortAsc=true;
+let huntUrls=[], huntFiltered=[], isHunting=false, huntSearchMode='free';
 let scanReport=null, scanFiltered=[], isScanning=false;
 let currentMode='generator';
 
@@ -18,7 +18,8 @@ const el={};
 
 function cache(){
     ['kwInput','kwFileUpload','kwClear','kwCount','opGrid','opCount','opAll','opNone',
-     'ftGrid','ftCount','ftAll','ftNone','siteInput','exclInput','useQuotes','genAll',
+     'ftGrid','ftCount','ftAll','ftNone','vpGrid','vpCount','vpAll','vpNone','vpCatList',
+     'siteInput','exclInput','useQuotes','genAll',
      'maxResults','maxGroup','genBtn','genSearch','genSort','genShuffle','genEmpty',
      'genList','genResCount','genBody','copyAll','copySel','expTxt','expCsv','expJson',
      'sendHunt','sendScan','statPossibleVal','statGeneratedVal','statPossible','statGenerated',
@@ -27,11 +28,12 @@ function cache(){
      'huntPages','huntConc','huntBtn','huntSearch','huntUrlCount','huntEmpty','huntList',
      'huntBody','huntCopyAll','huntExpTxt','huntExpCsv','huntExpJson','huntProgress',
      'huntProgressFill','huntProgressText','huntProgressNum','sendUrlsToScan',
+     'huntModeFree','huntModeApi','huntUseProxy','huntModeHint','huntFreeEnginesCard',
      'scanUrls','scanUrlCount','scanFileUpload','scanClearUrls','scanSqli','scanXss',
      'scanConc','scanTimeout','scanRate','scanBtn','scanSearch','scanResCount',
      'scanEmpty','scanList','scanBody','scanProgress','scanProgressFill','scanProgressText',
      'scanProgressNum','scanSummary','sumUrls','sumFindings','sumSqli','sumXss',
-     'scanCopyFindings','scanExpTxt','scanExpCsv','scanExpJson',
+     'scanCopyFindings','scanExpTxt','scanExpCsv','scanExpJson','scanUseProxy',
      'setSerperKeys','saveKeysBtn','setProxyOn','setProxies','proxyFileUpload',
      'testProxiesBtn','saveProxiesBtn','proxyTestBox','proxyTestSummary','proxyTestList',
      'saveWorkingBtn','stSerper','stProxy','stProxyCount'
@@ -45,12 +47,12 @@ async function init(){
         if(!r.ok)throw new Error('HTTP '+r.status);
         engineConfig=await r.json();
     }catch(e){toast('Failed to load config','err');return}
-    setupNav();setupEngine();renderOps();renderFt();
+    setupNav();setupEngine();renderOps();renderFt();renderVulnParams();
     bindGen();bindHunt();bindScan();bindSettings();
     updateCounts();syncGenAll();loadStatus();
 }
 
-/* ── Nav ── */
+/* -- Nav -- */
 function setupNav(){
     $$('.nav-tab').forEach(t=>t.addEventListener('click',()=>switchMode(t.dataset.mode)));
 }
@@ -66,7 +68,7 @@ function switchMode(m){
     if(m==='settings')loadStatus();
 }
 
-/* ── Generator ── */
+/* -- Generator -- */
 function setupEngine(){
     $$('.engine-opt').forEach(o=>{
         o.addEventListener('click',()=>{
@@ -74,7 +76,7 @@ function setupEngine(){
             o.classList.add('engine-opt--on');
             currentEngine=o.dataset.engine;
             o.querySelector('input').checked=true;
-            renderOps();renderFt();updateCounts();
+            renderOps();renderFt();renderVulnParams();updateCounts();
         });
     });
 }
@@ -101,22 +103,70 @@ function renderFt(){
         el.ftGrid.appendChild(c);
     });
 }
+function renderVulnParams(){
+    const vp=engineConfig?.vuln_params;
+    if(!vp||!el.vpGrid)return;
+    el.vpGrid.innerHTML='';
+    // Render generic patterns as chips
+    const generic=vp.patterns?.generic||[];
+    generic.forEach(p=>{
+        const c=document.createElement('button');c.type='button';
+        c.className='chip';c.dataset.vulnparam=p;c.textContent=p;
+        c.addEventListener('click',()=>{c.classList.toggle('chip--on');updateVpCount()});
+        el.vpGrid.appendChild(c);
+    });
+    updateVpCount();
+    // Categories
+    if(el.vpCatList){
+        el.vpCatList.innerHTML='';
+        const cats=vp.patterns||{};
+        Object.keys(cats).forEach(cat=>{
+            if(cat==='generic')return;
+            const btn=document.createElement('button');
+            btn.className='preset-chip';
+            btn.innerHTML=`${cat.toUpperCase()} <span class="badge badge--sm">${cats[cat].length}</span>`;
+            btn.addEventListener('click',()=>{
+                cats[cat].forEach(p=>{
+                    const existing=el.vpGrid.querySelector(`[data-vulnparam="${CSS.escape(p)}"]`);
+                    if(!existing){
+                        const c=document.createElement('button');c.type='button';
+                        c.className='chip chip--on';c.dataset.vulnparam=p;c.textContent=p;
+                        c.addEventListener('click',()=>{c.classList.toggle('chip--on');updateVpCount()});
+                        el.vpGrid.appendChild(c);
+                    }else{existing.classList.add('chip--on')}
+                });
+                updateVpCount();toast('Added '+cats[cat].length+' '+cat+' patterns');
+            });
+            el.vpCatList.appendChild(btn);
+        });
+    }
+}
+function updateVpCount(){
+    if(el.vpCount)el.vpCount.textContent=getVps().length;
+}
+function getVps(){return el.vpGrid?[...el.vpGrid.querySelectorAll('.chip--on')].map(c=>c.dataset.vulnparam):[]}
+
 function bindGen(){
     el.genBtn?.addEventListener('click',generate);
     el.kwInput?.addEventListener('input',updateCounts);
     el.kwFileUpload?.addEventListener('change',e=>fileUpload(e,el.kwInput,()=>updateCounts()));
     el.kwClear?.addEventListener('click',()=>{if(el.kwInput)el.kwInput.value='';updateCounts()});
-    $$('.preset-chip').forEach(b=>b.addEventListener('click',()=>{
-        const kws=b.dataset.keywords.split('||');
-        if(!el.kwInput)return;
-        const cur=el.kwInput.value.trim();
-        el.kwInput.value=cur?cur+'\n'+kws.join('\n'):kws.join('\n');
-        updateCounts();toast('Added '+kws.length+' keywords');
-    }));
+    $$('.preset-chip').forEach(b=>{
+        if(!b.dataset.keywords)return;
+        b.addEventListener('click',()=>{
+            const kws=b.dataset.keywords.split('||');
+            if(!el.kwInput)return;
+            const cur=el.kwInput.value.trim();
+            el.kwInput.value=cur?cur+'\n'+kws.join('\n'):kws.join('\n');
+            updateCounts();toast('Added '+kws.length+' keywords');
+        });
+    });
     el.opAll?.addEventListener('click',()=>toggleAll(el.opGrid,true));
     el.opNone?.addEventListener('click',()=>toggleAll(el.opGrid,false));
     el.ftAll?.addEventListener('click',()=>toggleAll(el.ftGrid,true));
     el.ftNone?.addEventListener('click',()=>toggleAll(el.ftGrid,false));
+    el.vpAll?.addEventListener('click',()=>{toggleAll(el.vpGrid,true);updateVpCount()});
+    el.vpNone?.addEventListener('click',()=>{toggleAll(el.vpGrid,false);updateVpCount()});
     el.genAll?.addEventListener('change',syncGenAll);
     el.genSearch?.addEventListener('input',applyGenFilter);
     el.genSort?.addEventListener('click',sortGen);
@@ -162,6 +212,12 @@ function updateCounts(){
     else if(o>0){p+=o*k;if(o>=2)p+=o*(o-1)/2*k}
     else if(f>0)p+=k*f;
     else p+=k;
+    // Add vuln param combinations estimate
+    const vps=getVps();
+    if(vps.length>0&&k>0){
+        p+=vps.length*k; // inurl:pattern + keyword
+        p+=vps.length*nonFt.filter(x=>x!=='inurl').length*k; // inurl:pattern + op + keyword
+    }
     if(el.statPossibleVal)el.statPossibleVal.textContent=p.toLocaleString();
 }
 function getKws(){return el.kwInput?el.kwInput.value.split('\n').map(l=>l.trim()).filter(l=>l):[]}
@@ -174,7 +230,8 @@ async function generate(){
     let max=parseInt(el.maxResults?.value,10);if(isNaN(max)||max<0)max=100;if(genAllOn)max=0;
     const body={engine:currentEngine,keywords:kws,operators:getOps(),filetypes:getFts(),
         site:el.siteInput?.value.trim()||'',use_quotes:el.useQuotes?.checked||false,
-        exclusions:(el.exclInput?.value||'').split('\n').map(l=>l.trim()).filter(l=>l),max_results:max};
+        exclusions:(el.exclInput?.value||'').split('\n').map(l=>l.trim()).filter(l=>l),
+        max_results:max,vuln_params:getVps()};
     showLoad('Generating...',max===0?'Generating ALL combinations...':'Processing');
     el.genBtn&&(el.genBtn.disabled=true);
     try{
@@ -182,18 +239,18 @@ async function generate(){
         if(!r.ok)throw new Error('HTTP '+r.status);
         const d=await r.json();if(d.error){toast(d.error,'err');return}
         allDorks=d.dorks||[];filteredDorks=[...allDorks];selectedRows.clear();
-        useVirtual=filteredDorks.length>CHUNK;
         if(el.statGeneratedVal)el.statGeneratedVal.textContent=d.total_generated.toLocaleString();
         if(el.statPossibleVal)el.statPossibleVal.textContent=d.total_possible.toLocaleString();
         renderGen();updateGenBtns();
-        toast(allDorks.length?`Generated ${allDorks.length.toLocaleString()} dorks for ${d.engine_name}`:'No dorks generated','warn');
+        if(allDorks.length)toast(`Generated ${allDorks.length.toLocaleString()} dorks for ${d.engine_name}`);
+        else toast('No dorks generated','warn');
     }catch(e){toast('Error: '+e.message,'err')}
     finally{hideLoad();el.genBtn&&(el.genBtn.disabled=false)}
 }
 function renderGen(){if(el.genSearch)el.genSearch.value='';renderGenFiltered()}
 function renderGenFiltered(){
-    if(!filteredDorks.length){show(el.genEmpty);hide(el.genList);if(el.genResCount)el.genResCount.textContent='0 dorks';return}
-    hide(el.genEmpty);show(el.genList);
+    if(!filteredDorks.length){showEl(el.genEmpty);hideEl(el.genList);if(el.genResCount)el.genResCount.textContent='0 dorks';return}
+    hideEl(el.genEmpty);showEl(el.genList);
     const frag=document.createDocumentFragment();
     filteredDorks.forEach((d,i)=>frag.appendChild(mkDorkRow(d,i+1)));
     el.genList.innerHTML='';el.genList.appendChild(frag);
@@ -204,7 +261,7 @@ function mkDorkRow(dork,n){
     const num=document.createElement('div');num.className='dork-row__num';num.textContent=n;
     const txt=document.createElement('div');txt.className='dork-row__text';txt.innerHTML=hlDork(dork);
     const cp=document.createElement('button');cp.type='button';cp.className='dork-row__copy';
-    cp.innerHTML='&#x1F4CB;';cp.title='Copy';
+    cp.textContent='Copy';cp.title='Copy';
     cp.addEventListener('click',e=>{e.stopPropagation();clip(dork);toast('Copied')});
     row.addEventListener('click',()=>{
         const i=parseInt(row.dataset.index,10);
@@ -244,7 +301,7 @@ async function exportDorks(fmt){
     }catch(e){toast('Export failed','err')}
 }
 
-/* ── Hunter ── */
+/* -- Hunter -- */
 function bindHunt(){
     el.huntBtn?.addEventListener('click',huntSearch);
     el.huntDorks?.addEventListener('input',updateHuntDorkCount);
@@ -261,27 +318,53 @@ function bindHunt(){
         if(el.scanUrls)el.scanUrls.value=huntFiltered.join('\n');
         updateScanUrlCount();switchMode('scanner');toast('Sent '+huntFiltered.length+' URLs to Scanner');
     });
+    // Mode switching
+    el.huntModeFree?.addEventListener('click',()=>{setHuntMode('free')});
+    el.huntModeApi?.addEventListener('click',()=>{setHuntMode('api')});
+}
+function setHuntMode(mode){
+    huntSearchMode=mode;
+    el.huntModeFree?.classList.toggle('chip--on',mode==='free');
+    el.huntModeApi?.classList.toggle('chip--on',mode==='api');
+    if(el.huntFreeEnginesCard){
+        el.huntFreeEnginesCard.style.display=mode==='free'?'':'none';
+    }
+    if(el.huntModeHint){
+        if(mode==='free')el.huntModeHint.textContent='Free mode: scrape search engines directly. No API key needed.';
+        else el.huntModeHint.textContent='API mode: use Serper.dev API for Google results. Requires API key in Settings.';
+    }
 }
 function updateHuntDorkCount(){if(el.huntDorks&&el.huntDorkCount)el.huntDorkCount.textContent=el.huntDorks.value.split('\n').filter(l=>l.trim()).length}
 async function huntSearch(){
     if(isHunting)return;
     const dorks=el.huntDorks?.value.split('\n').map(l=>l.trim()).filter(l=>l)||[];
     if(!dorks.length){toast('Enter dork queries','warn');el.huntDorks?.focus();return}
-    const engs=[...el.huntEngines?.querySelectorAll('.chip--on')||[]].map(c=>c.dataset.engine).filter(e=>['duckduckgo','bing','yahoo','google','ask'].includes(e));
-    if(!engs.length){toast('Select an engine','warn');return}
+    const useProxy=el.huntUseProxy?.checked||false;
+
+    let engs=[];
+    if(huntSearchMode==='free'){
+        engs=[...el.huntEngines?.querySelectorAll('.chip--on')||[]].map(c=>c.dataset.engine).filter(e=>['duckduckgo','bing','yahoo','google','ask'].includes(e));
+        if(!engs.length){toast('Select at least one engine','warn');return}
+    }
+
     const pages=parseInt(el.huntPages?.value,10)||1,conc=parseInt(el.huntConc?.value,10)||3;
     isHunting=true;huntUrls=[];huntFiltered=[];
-    show(el.huntProgress);hide(el.huntEmpty);show(el.huntList);
+    showEl(el.huntProgress);hideEl(el.huntEmpty);showEl(el.huntList);
     if(el.huntList)el.huntList.innerHTML='';
     setProgress(el.huntProgressFill,5);
-    if(el.huntProgressText)el.huntProgressText.textContent=`Searching ${dorks.length} dorks across ${engs.length} engines...`;
+    const modeLabel=huntSearchMode==='api'?'Serper API':engs.join(', ');
+    if(el.huntProgressText)el.huntProgressText.textContent=`Searching ${dorks.length} dorks via ${modeLabel}${useProxy?' (proxy)':''}...`;
     if(el.huntProgressNum)el.huntProgressNum.textContent='0 URLs';
     el.huntBtn&&(el.huntBtn.disabled=true);el.huntBtn&&(el.huntBtn.textContent='Hunting...');
     updateHuntBtns();
     let cnt=0;
     try{
-        const r=await fetch('/api/hunter/search/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dorks,engines:engs,pages_per_dork:pages,max_concurrency:conc,use_proxy:false})});
-        if(!r.ok)throw new Error('HTTP '+r.status);
+        const body={dorks,search_mode:huntSearchMode,engines:engs,pages_per_dork:pages,max_concurrency:conc,use_proxy:useProxy};
+        const r=await fetch('/api/hunter/search/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!r.ok){
+            const errData=await r.json().catch(()=>({}));
+            throw new Error(errData.error||'HTTP '+r.status);
+        }
         const reader=r.body.getReader(),dec=new TextDecoder();let buf='',evtType='';
         while(true){
             const{done,value}=await reader.read();if(done)break;
@@ -293,19 +376,19 @@ async function huntSearch(){
                         const d=JSON.parse(ln.substring(6));
                         if(evtType==='url'){cnt++;huntUrls.push(d.url);huntFiltered.push(d.url);appendUrl(d.url,cnt);if(el.huntUrlCount)el.huntUrlCount.textContent=cnt+' URLs';if(el.huntProgressNum)el.huntProgressNum.textContent=cnt+' URLs'}
                         else if(evtType==='progress'){setProgress(el.huntProgressFill,Math.min(90,5+(cnt/Math.max(1,dorks.length))*85))}
-                        else if(evtType==='done'){setProgress(el.huntProgressFill,100);if(el.huntProgressText)el.huntProgressText.textContent='Done!';if(el.huntProgressNum)el.huntProgressNum.textContent=d.total_urls+' URLs'}
+                        else if(evtType==='done'){setProgress(el.huntProgressFill,100);if(el.huntProgressText)el.huntProgressText.textContent='Done!';if(el.huntProgressNum)el.huntProgressNum.textContent=(d.total_urls||cnt)+' URLs'}
                         else if(evtType==='error')toast('Error: '+(d.error||'Unknown'),'err');
                     }catch(_){}evtType='';
                 }
             }
         }
         updateHuntBtns();toast(huntUrls.length?`Extracted ${huntUrls.length} URLs`:'No URLs found','warn');
-        if(!huntUrls.length){show(el.huntEmpty);hide(el.huntList)}
+        if(!huntUrls.length){showEl(el.huntEmpty);hideEl(el.huntList)}
     }catch(e){toast('Hunt failed: '+e.message,'err')}
     finally{
         isHunting=false;el.huntBtn&&(el.huntBtn.disabled=false);
         el.huntBtn&&(el.huntBtn.textContent='Start Hunting');
-        setTimeout(()=>hide(el.huntProgress),3000);
+        setTimeout(()=>hideEl(el.huntProgress),3000);
     }
 }
 function appendUrl(url,n){if(!el.huntList)return;el.huntList.appendChild(mkUrlRow(url,n));if(el.huntBody)el.huntBody.scrollTop=el.huntBody.scrollHeight}
@@ -314,7 +397,7 @@ function mkUrlRow(url,n){
     const num=document.createElement('div');num.className='url-row__num';num.textContent=n;
     const txt=document.createElement('div');txt.className='url-row__text';
     const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=url;txt.appendChild(a);
-    const cp=document.createElement('button');cp.type='button';cp.className='url-row__copy';cp.innerHTML='&#x1F4CB;';cp.title='Copy';
+    const cp=document.createElement('button');cp.type='button';cp.className='url-row__copy';cp.textContent='Copy';cp.title='Copy';
     cp.addEventListener('click',e=>{e.stopPropagation();clip(url);toast('Copied')});
     row.append(num,txt,cp);return row;
 }
@@ -324,8 +407,8 @@ function applyHuntFilter(){
     renderHuntList();updateHuntBtns();
 }
 function renderHuntList(){
-    if(!huntFiltered.length){show(el.huntEmpty);hide(el.huntList);if(el.huntUrlCount)el.huntUrlCount.textContent='0 URLs';return}
-    hide(el.huntEmpty);show(el.huntList);
+    if(!huntFiltered.length){showEl(el.huntEmpty);hideEl(el.huntList);if(el.huntUrlCount)el.huntUrlCount.textContent='0 URLs';return}
+    hideEl(el.huntEmpty);showEl(el.huntList);
     const frag=document.createDocumentFragment();
     huntFiltered.forEach((u,i)=>frag.appendChild(mkUrlRow(u,i+1)));
     el.huntList.innerHTML='';el.huntList.appendChild(frag);
@@ -344,7 +427,7 @@ async function exportHunt(fmt){
     }catch(e){toast('Export failed','err')}
 }
 
-/* ── Scanner ── */
+/* -- Scanner -- */
 function bindScan(){
     el.scanBtn?.addEventListener('click',startScan);
     el.scanUrls?.addEventListener('input',updateScanUrlCount);
@@ -364,15 +447,16 @@ async function startScan(){
     const sqli=el.scanSqli?.checked??true,xss=el.scanXss?.checked??true;
     if(!sqli&&!xss){toast('Enable at least one detection','warn');return}
     const conc=parseInt(el.scanConc?.value,10)||20,timeout=parseInt(el.scanTimeout?.value,10)||10,rate=parseInt(el.scanRate?.value,10)||50;
+    const useProxy=el.scanUseProxy?.checked||false;
     isScanning=true;scanReport=null;scanFiltered=[];
-    show(el.scanProgress);hide(el.scanEmpty);hide(el.scanSummary);hide(el.scanList);
+    showEl(el.scanProgress);hideEl(el.scanEmpty);hideEl(el.scanSummary);hideEl(el.scanList);
     setProgress(el.scanProgressFill,2);
-    if(el.scanProgressText)el.scanProgressText.textContent='Scanning '+urls.length+' URLs...';
+    if(el.scanProgressText)el.scanProgressText.textContent='Scanning '+urls.length+' URLs'+(useProxy?' (via proxy)':'')+'...';
     if(el.scanProgressNum)el.scanProgressNum.textContent='0%';
     el.scanBtn&&(el.scanBtn.disabled=true);el.scanBtn&&(el.scanBtn.textContent='Scanning...');
     updateScanBtns();
     try{
-        const r=await fetch('/api/scanner/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls,detect_sqli:sqli,detect_xss:xss,max_concurrency:conc,timeout:timeout,rate_limit:rate})});
+        const r=await fetch('/api/scanner/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({urls,detect_sqli:sqli,detect_xss:xss,max_concurrency:conc,timeout:timeout,rate_limit:rate,use_proxy:useProxy})});
         if(!r.ok)throw new Error('HTTP '+r.status);
         const reader=r.body.getReader(),dec=new TextDecoder();let buf='',evtType='';
         while(true){
@@ -406,15 +490,14 @@ async function startScan(){
     finally{
         isScanning=false;el.scanBtn&&(el.scanBtn.disabled=false);
         el.scanBtn&&(el.scanBtn.textContent='Start Scan');
-        setTimeout(()=>hide(el.scanProgress),3000);
+        setTimeout(()=>hideEl(el.scanProgress),3000);
     }
 }
 function renderScanResults(){
     if(!scanReport)return;
     const s=scanReport.summary||{},results=scanReport.results||[];
     scanFiltered=[...results];
-    // Summary
-    show(el.scanSummary);
+    showEl(el.scanSummary);
     if(el.sumUrls)el.sumUrls.textContent=s.total_urls||0;
     if(el.sumFindings)el.sumFindings.textContent=s.total_findings||0;
     if(el.sumSqli)el.sumSqli.textContent=(s.vuln_counts||{}).SQLi||0;
@@ -423,8 +506,8 @@ function renderScanResults(){
     renderScanList();updateScanBtns();
 }
 function renderScanList(){
-    if(!scanFiltered.length){show(el.scanEmpty);hide(el.scanList);return}
-    hide(el.scanEmpty);show(el.scanList);
+    if(!scanFiltered.length){showEl(el.scanEmpty);hideEl(el.scanList);return}
+    hideEl(el.scanEmpty);showEl(el.scanList);
     const frag=document.createDocumentFragment();
     scanFiltered.forEach(r=>frag.appendChild(mkScanRow(r)));
     el.scanList.innerHTML='';el.scanList.appendChild(frag);
@@ -485,7 +568,7 @@ async function exportScan(fmt){
     }catch(e){toast('Export failed','err')}
 }
 
-/* ── Settings ── */
+/* -- Settings -- */
 function bindSettings(){
     el.saveKeysBtn?.addEventListener('click',async()=>{
         const keys=(el.setSerperKeys?.value||'').split('\n').map(k=>k.trim()).filter(k=>k);
@@ -500,8 +583,8 @@ function bindSettings(){
     el.testProxiesBtn?.addEventListener('click',async()=>{
         const proxies=(el.setProxies?.value||'').split('\n').map(p=>p.trim()).filter(p=>p);
         if(!proxies.length){toast('No proxies','warn');return}
-        show(el.proxyTestBox);if(el.proxyTestSummary)el.proxyTestSummary.textContent='Testing '+proxies.length+'...';
-        if(el.proxyTestList)el.proxyTestList.innerHTML='';hide(el.saveWorkingBtn);
+        showEl(el.proxyTestBox);if(el.proxyTestSummary)el.proxyTestSummary.textContent='Testing '+proxies.length+'...';
+        if(el.proxyTestList)el.proxyTestList.innerHTML='';hideEl(el.saveWorkingBtn);
         el.testProxiesBtn&&(el.testProxiesBtn.disabled=true);
         try{
             const r=await fetch('/api/settings/proxies/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({proxies,timeout:10})});
@@ -511,7 +594,7 @@ function bindSettings(){
             (d.working||[]).forEach(p=>html+=`<div class="proxy-test-item proxy-test-item--ok"><span>${esc(p)}</span><span>OK</span></div>`);
             (d.failed||[]).forEach(p=>html+=`<div class="proxy-test-item proxy-test-item--fail"><span>${esc(p)}</span><span>FAIL</span></div>`);
             if(el.proxyTestList)el.proxyTestList.innerHTML=html;
-            if(d.total_working>0){show(el.saveWorkingBtn);el.saveWorkingBtn.onclick=async()=>{
+            if(d.total_working>0){showEl(el.saveWorkingBtn);el.saveWorkingBtn.onclick=async()=>{
                 try{await fetch('/api/settings/proxies/save-working',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({working:d.working})});
                 if(el.setProxies)el.setProxies.value=d.working.join('\n');if(el.setProxyOn)el.setProxyOn.checked=true;toast('Saved working proxies');loadStatus()}catch(err){toast('Failed','err')}
             }}
@@ -532,13 +615,17 @@ async function loadStatus(){
     }catch(_){}
 }
 
-/* ── Utilities ── */
-function show(e){if(e)e.style.display=''}
-function hide(e){if(e)e.style.display='none'}
-function showLoad(t,s){show(el.overlay);if(el.overlayTitle)el.overlayTitle.textContent=t||'Processing...';if(el.overlaySub)el.overlaySub.textContent=s||'Please wait'}
-function hideLoad(){hide(el.overlay)}
+/* -- Utilities -- */
+function showEl(e){if(e)e.style.display=''}
+function hideEl(e){if(e)e.style.display='none'}
+function showLoad(t,s){showEl(el.overlay);if(el.overlayTitle)el.overlayTitle.textContent=t||'Processing...';if(el.overlaySub)el.overlaySub.textContent=s||'Please wait'}
+function hideLoad(){hideEl(el.overlay)}
 function toggleAll(g,on){if(!g)return;g.querySelectorAll('.chip').forEach(c=>{if(on)c.classList.add('chip--on');else c.classList.remove('chip--on')});updateCounts()}
-function setProgress(el,pct){if(el)el.style.setProperty('--w',Math.min(100,Math.max(0,pct))+'%');if(el)el.querySelector?.('::after')||void 0;if(el&&el.style)el.style.cssText=`position:relative;height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:.3rem`; /* fallback */}
+function setProgress(fillEl,pct){
+    if(!fillEl)return;
+    const p=Math.min(100,Math.max(0,pct));
+    fillEl.innerHTML=`<div style="height:100%;width:${p}%;background:linear-gradient(90deg,var(--teal),var(--blue));border-radius:2px;transition:width .3s ease"></div>`;
+}
 function fileUpload(e,target,cb){
     const f=e.target.files?.[0];if(!f||!target)return;
     const r=new FileReader();r.onload=ev=>{
@@ -556,14 +643,6 @@ function toast(msg,type){
     document.body.appendChild(t);setTimeout(()=>{if(t.parentNode)t.remove()},2700);
 }
 function esc(s){const d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML}
-
-// Fix progress bar - use CSS custom property approach
-function setProgress(fillEl, pct) {
-    if (!fillEl) return;
-    const p = Math.min(100, Math.max(0, pct));
-    // The fill element uses ::after pseudo element, set width via inline style on a child
-    fillEl.innerHTML = `<div style="height:100%;width:${p}%;background:linear-gradient(90deg,var(--teal),var(--blue));border-radius:2px;transition:width .3s ease"></div>`;
-}
 
 document.addEventListener('DOMContentLoaded',init);
 })();

@@ -23,6 +23,7 @@ Performance features:
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 from datetime import datetime, timezone
 from typing import Callable, Optional
@@ -116,7 +117,10 @@ def _build_xss_probe(canary: str) -> str:
 # ---------------------------------------------------------------------------
 
 class ScanOrchestrator:
-    """Coordinates the full async scan pipeline."""
+    """Coordinates the full async scan pipeline.
+
+    Supports optional proxy rotation for all outgoing requests.
+    """
 
     def __init__(self, config: ScanConfig | None = None) -> None:
         self.config = config or ScanConfig()
@@ -126,6 +130,8 @@ class ScanOrchestrator:
         )
         self._rate_limiter = _RateLimiter(self.config.rate_limit_rps)
         self._semaphore: asyncio.Semaphore | None = None
+        self._proxies = list(self.config.proxies) if self.config.use_proxy else []
+        self._proxy_index = 0
 
     # ------------------------------------------------------------------
     # Public API
@@ -276,20 +282,39 @@ class ScanOrchestrator:
         return findings
 
     # ------------------------------------------------------------------
+    # Proxy support
+    # ------------------------------------------------------------------
+
+    def _get_proxy(self) -> Optional[str]:
+        """Get next proxy in rotation, or None if no proxies."""
+        if not self._proxies:
+            return None
+        proxy = self._proxies[self._proxy_index % len(self._proxies)]
+        self._proxy_index += 1
+        if not proxy.startswith(("http://", "https://", "socks")):
+            proxy = "http://" + proxy
+        return proxy
+
+    # ------------------------------------------------------------------
     # HTTP layer
     # ------------------------------------------------------------------
 
     async def _fetch(self, url: str) -> HTTPResponse:
         """Fetch a URL with rate limiting and timeout."""
         await self._rate_limiter.acquire()
+        proxy = self._get_proxy()
 
         try:
-            async with httpx.AsyncClient(
-                timeout=self.config.timeout_seconds,
-                follow_redirects=self.config.follow_redirects,
-                verify=self.config.verify_ssl,
-                headers={"User-Agent": self.config.user_agent},
-            ) as client:
+            client_kwargs: dict = {
+                "timeout": self.config.timeout_seconds,
+                "follow_redirects": self.config.follow_redirects,
+                "verify": self.config.verify_ssl,
+                "headers": {"User-Agent": self.config.user_agent},
+            }
+            if proxy:
+                client_kwargs["proxy"] = proxy
+
+            async with httpx.AsyncClient(**client_kwargs) as client:
                 t0 = time.monotonic()
                 resp = await client.get(url)
                 elapsed = (time.monotonic() - t0) * 1000

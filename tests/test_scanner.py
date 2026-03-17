@@ -118,6 +118,15 @@ class TestModels(unittest.TestCase):
         self.assertEqual(d["max_concurrency"], 5)
         self.assertFalse(d["detect_xss"])
 
+    def test_scan_config_proxy(self):
+        cfg = ScanConfig(
+            use_proxy=True,
+            proxies=["http://proxy1:8080", "socks5://proxy2:1080"],
+        )
+        d = cfg.to_dict()
+        self.assertTrue(d["use_proxy"])
+        self.assertEqual(d["proxy_count"], 2)
+
 
 # ===========================================================================
 # SQLi Detector Tests
