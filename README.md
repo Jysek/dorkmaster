@@ -1,6 +1,6 @@
 # DorkMaster
 
-Unified dork generation and URL extraction tool. Combines **DorkBoxer** (dork generator) and **DorkHunter** (URL extractor) into one powerful tool with both CLI and Web interfaces.
+Unified dork generation, URL extraction, and security scanning tool. Combines **DorkBoxer** (dork generator), **DorkHunter** (URL extractor), and **Scanner** (SQLi/XSS detector) into one powerful tool with both CLI and Web interfaces.
 
 ## Features
 
@@ -20,11 +20,20 @@ Unified dork generation and URL extraction tool. Combines **DorkBoxer** (dork ge
 - **De-duplication**: Automatic URL dedup and junk filtering
 - **Real-time Updates**: URLs saved as discovered
 
+### Security Scanner
+- **SQL Injection (SQLi)**: Error-based, boolean-differential, and timing detection
+- **Cross-Site Scripting (XSS)**: Reflection detection with context analysis
+- **Safe Detection**: No invasive payloads, heuristic analysis only
+- **Async Pipeline**: Configurable concurrency and rate limiting
+- **Missing Headers**: Flags absent security headers (CSP, X-XSS-Protection, etc.)
+- **Export**: JSON, TXT, CSV scan reports
+
 ### Unified Interface
-- **Web UI**: Modern dark theme with tabbed Generator/Hunter
-- **CLI**: Interactive terminal with ASCII art banner
+- **Web UI**: Modern dark theme with tabbed Generator/Hunter/Scanner/Settings
+- **CLI**: Interactive terminal with ASCII art banner and 6 operations
 - **Generate & Hunt**: Generate dorks then immediately search them
-- **Send to Hunter**: One-click transfer from Generator to Hunter
+- **Hunt & Scan**: Extract URLs then scan them for vulnerabilities
+- **Send to Hunter/Scanner**: One-click transfer between tabs
 
 ## Project Structure
 
@@ -34,7 +43,7 @@ dorkmaster/
 ├── cli.py                      # Interactive CLI entry point
 ├── core/
 │   ├── __init__.py             # Version info
-│   └── engine.py               # Dork generation engine (config, builder, validator, generator)
+│   └── engine.py               # Dork generation engine
 ├── config/
 │   └── default_config.json     # Engine operators, filetypes, keywords, rules
 ├── hunter/
@@ -42,24 +51,36 @@ dorkmaster/
 │   ├── orchestrator.py         # Search pipeline orchestrator
 │   ├── search/
 │   │   ├── engine.py           # Serper.dev API client
-│   │   ├── free_engine.py      # Free multi-engine search (DDG/Bing/Yahoo/Google/Ask)
+│   │   ├── free_engine.py      # Free multi-engine search
 │   │   └── key_manager.py      # API key pool & rotation
 │   ├── reporting/
 │   │   └── exporter.py         # TXT/JSON/CSV export + realtime exporter
 │   └── utils/
 │       └── logging.py          # Structured logging
+├── scanner/
+│   ├── __init__.py             # Package exports
+│   ├── models.py               # Data structures (ScanResult, ScanConfig, enums)
+│   ├── orchestrator.py         # Async scan pipeline with concurrency control
+│   ├── detectors/
+│   │   ├── __init__.py         # Detector registry
+│   │   ├── base.py             # Abstract detector interface
+│   │   ├── sqli.py             # SQL Injection heuristic detector
+│   │   └── xss.py              # Cross-Site Scripting heuristic detector
+│   └── reporting/
+│       └── exporter.py         # JSON / TXT / CSV scan report export
 ├── web/
-│   ├── api.py                  # REST API endpoints (generator + hunter)
+│   ├── api.py                  # REST API endpoints (generator + hunter + scanner)
 │   ├── views.py                # Page rendering routes
 │   ├── routes.py               # Blueprint registration
 │   ├── templates/
-│   │   └── index.html          # Main UI template (tabbed Generator/Hunter)
+│   │   └── index.html          # Main UI template (tabbed interface)
 │   └── static/
 │       ├── css/style.css       # Dark theme styles
 │       ├── js/app.js           # Frontend logic
 │       └── favicon.svg
 ├── tests/
-│   └── test_dorkmaster.py      # 34 tests (all passing)
+│   ├── test_dorkmaster.py      # Generator, Flask API, Hunter tests
+│   └── test_scanner.py         # Scanner models, detectors, orchestrator tests
 ├── dorks.txt                   # Sample dork queries
 ├── requirements.txt
 ├── .env.example
@@ -100,14 +121,14 @@ python cli.py
 | 5 | **Web Interface** | Launch the web UI |
 | 6 | **Help** | Usage guide |
 
-## Web UI Features
+## Web UI Workflow
 
-- **Generator Tab**: Select engine, enter keywords, pick operators/filetypes, generate dorks
-- **Hunter Tab**: Enter dorks, select search engines, extract URLs
-- **Send to Hunter**: Button to transfer generated dorks directly to Hunter tab
-- **Syntax Highlighting**: Color-coded operators, keywords, filetypes
-- **Virtual Scrolling**: Handles 500K+ dorks without lag
-- **Export**: Download results as TXT, CSV, or JSON
+1. **Generator Tab**: Select engine, enter keywords, pick operators/filetypes, generate dorks
+2. **Send to Hunter**: Click "Hunt" to transfer dorks to Hunter tab
+3. **Hunter Tab**: Select search engines, extract URLs from dork queries
+4. **Send to Scanner**: Click "Scan" to transfer URLs to Scanner tab
+5. **Scanner Tab**: Configure detection options, scan URLs for SQLi/XSS
+6. **Export**: Download results from any tab as TXT, CSV, or JSON
 
 ## Configuration
 
@@ -119,11 +140,6 @@ Environment variables (or `.env` file):
 | `QUERIES_FILE` | `dorks.txt` | Path to dork queries file |
 | `FREE_SEARCH_ENGINES` | `duckduckgo,bing` | Default engines for free mode |
 | `SEARCH_MAX_THREADS` | `10` | Max concurrent threads |
-
-### Scanner Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
 | `SCAN_MAX_CONCURRENCY` | `20` | Max concurrent scan requests |
 | `SCAN_TIMEOUT` | `10` | Per-request timeout (seconds) |
 | `SCAN_RATE_LIMIT_RPS` | `50` | Rate limit (requests/sec, 0=unlimited) |
@@ -134,7 +150,7 @@ Environment variables (or `.env` file):
 python -m pytest tests/ -v
 ```
 
-All 80+ tests pass covering: config, builder, validator, generator, Flask API, hunter modules, scanner models, SQLi detector, XSS detector, orchestrator, reporting.
+All 95+ tests pass covering: config, builder, validator, generator, Flask API, hunter modules, scanner models, SQLi detector, XSS detector, orchestrator, reporting, scanner API endpoints.
 
 ## License
 
