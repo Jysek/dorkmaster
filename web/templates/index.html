@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DorkMaster - Dork Generator & Hunter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DorkMaster - Generator, Hunter & Scanner</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,510 +15,289 @@
     <header class="header">
         <div class="header__brand">
             <div class="header__logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
                 </svg>
             </div>
             <div>
                 <h1 class="header__title">DorkMaster</h1>
-                <span class="header__subtitle">Generator & Hunter</span>
+                <span class="header__subtitle">Generator &bull; Hunter &bull; Scanner</span>
             </div>
         </div>
 
-        <!-- Mode Tabs -->
-        <div class="mode-tabs">
-            <button class="mode-tab mode-tab--active" data-mode="generator" id="tabGenerator">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                Generator
+        <nav class="nav-tabs" id="navTabs">
+            <button class="nav-tab nav-tab--active" data-mode="generator">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Generator</span>
             </button>
-            <button class="mode-tab" data-mode="hunter" id="tabHunter">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="22" y1="22" x2="16.65" y2="16.65"/></svg>
-                Hunter
+            <button class="nav-tab" data-mode="hunter">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <span>Hunter</span>
             </button>
-            <button class="mode-tab" data-mode="settings" id="tabSettings">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                Settings
+            <button class="nav-tab" data-mode="scanner">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Scanner</span>
             </button>
-        </div>
+            <button class="nav-tab" data-mode="settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span>Settings</span>
+            </button>
+        </nav>
 
-        <div class="header__stats">
-            <div class="stat-chip" id="statPossibleChip">
-                <div>
-                    <span class="stat-chip__label">Possible</span>
-                    <span class="stat-chip__value" id="statPossibleVal">0</span>
-                </div>
+        <div class="header__info">
+            <div class="stat-pill" id="statPossible">
+                <span class="stat-pill__label">Possible</span>
+                <span class="stat-pill__value" id="statPossibleVal">0</span>
             </div>
-            <div class="stat-chip stat-chip--accent" id="statGeneratedChip">
-                <div>
-                    <span class="stat-chip__label">Generated</span>
-                    <span class="stat-chip__value" id="statGeneratedVal">0</span>
-                </div>
-            </div>
-            <div class="header__kbd" title="Ctrl+Enter to run">
-                <kbd>Ctrl</kbd>+<kbd>Enter</kbd>
+            <div class="stat-pill stat-pill--accent" id="statGenerated">
+                <span class="stat-pill__label">Generated</span>
+                <span class="stat-pill__value" id="statGeneratedVal">0</span>
             </div>
         </div>
     </header>
 
-    <main class="layout">
-        <!-- =============================== -->
-        <!-- GENERATOR MODE -->
-        <!-- =============================== -->
-        <div id="modeGenerator" class="mode-content mode-content--active">
-            <aside class="panel panel--config" id="configPanel">
-                <div class="panel__scroll">
-                    <!-- Search Engine Selector -->
-                    <section class="card" id="engineCard">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                            Search Engine
-                        </h2>
-                        <div class="engine-selector" id="engineSelector">
+    <main class="main">
+        <!-- ====================== GENERATOR ====================== -->
+        <div id="modeGenerator" class="mode mode--active">
+            <aside class="sidebar" id="genSidebar">
+                <div class="sidebar__scroll">
+                    <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Search Engine</h2>
+                        <div class="engine-grid" id="engineSelector">
                             {% for eid, eng in engines.items() %}
-                            <label class="engine-option{% if eid == 'google' %} engine-option--active{% endif %}" data-engine="{{ eid }}">
-                                <input type="radio" name="engine" value="{{ eid }}" {% if eid == 'google' %}checked{% endif %}>
-                                <span class="engine-option__name">{{ eng.name }}</span>
-                                <span class="engine-option__count">{{ eng.operators|length }} ops</span>
+                            <label class="engine-opt{% if eid == 'google' %} engine-opt--on{% endif %}" data-engine="{{ eid }}">
+                                <input type="radio" name="engine" value="{{ eid }}" {% if eid == 'google' %}checked{% endif %} hidden>
+                                <span class="engine-opt__name">{{ eng.name }}</span>
+                                <span class="engine-opt__badge">{{ eng.operators|length }}</span>
                             </label>
                             {% endfor %}
                         </div>
                     </section>
 
-                    <!-- Keywords -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                            Keywords
-                            <span class="badge" id="keywordCount">0</span>
-                        </h2>
-                        <p class="card__hint">One keyword per line. Use preset categories to quickly populate.</p>
-                        <textarea class="textarea" id="keywordsInput" rows="5"
-                                  placeholder="login&#10;admin panel&#10;dashboard&#10;config"
-                                  spellcheck="false"></textarea>
-                        <div class="card__actions">
-                            <label class="btn btn--outline btn--sm" title="Upload keywords from .txt file">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                                Upload TXT
-                                <input type="file" id="keywordFileUpload" accept=".txt" hidden>
-                            </label>
-                            <button class="btn btn--outline btn--sm" id="clearKeywords" title="Clear all keywords">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                Clear
-                            </button>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Keywords <span class="badge" id="kwCount">0</span></h2>
+                        <textarea class="input-area" id="kwInput" rows="4" placeholder="login&#10;admin panel&#10;dashboard" spellcheck="false"></textarea>
+                        <div class="row gap-xs mt-xs">
+                            <label class="btn btn--ghost btn--xs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload<input type="file" id="kwFileUpload" accept=".txt" hidden></label>
+                            <button class="btn btn--ghost btn--xs" id="kwClear">Clear</button>
                         </div>
-                        <details class="accordion" id="presetAccordion">
-                            <summary class="accordion__header">Preset Categories</summary>
-                            <div class="accordion__body" id="presetKeywords">
-                                {% for cat_name, cat_keywords in default_keywords.items() %}
-                                <button class="preset-btn" data-keywords="{{ cat_keywords | join('||') }}">
-                                    <span>{{ cat_name }}</span>
-                                    <span class="badge badge--sm">{{ cat_keywords|length }}</span>
-                                </button>
+                        <details class="accordion">
+                            <summary class="accordion__head">Preset Categories</summary>
+                            <div class="accordion__body" id="presetList">
+                                {% for cat, kws in default_keywords.items() %}
+                                <button class="preset-chip" data-keywords="{{ kws|join('||') }}">{{ cat }} <span class="badge badge--sm">{{ kws|length }}</span></button>
                                 {% endfor %}
                             </div>
                         </details>
                     </section>
 
-                    <!-- Operators -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                            Operators
-                            <span class="badge" id="operatorCount">0</span>
-                        </h2>
-                        <div class="chip-grid" id="operatorGrid"></div>
-                        <div class="card__actions">
-                            <button class="btn btn--outline btn--sm" id="selectAllOps">Select All</button>
-                            <button class="btn btn--outline btn--sm" id="deselectAllOps">Deselect All</button>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg> Operators <span class="badge" id="opCount">0</span></h2>
+                        <div class="chip-wrap" id="opGrid"></div>
+                        <div class="row gap-xs mt-xs">
+                            <button class="btn btn--ghost btn--xs" id="opAll">All</button>
+                            <button class="btn btn--ghost btn--xs" id="opNone">None</button>
                         </div>
                     </section>
 
-                    <!-- Filetypes -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            File Types
-                            <span class="badge" id="filetypeCount">0</span>
-                        </h2>
-                        <div class="chip-grid chip-grid--compact" id="filetypeGrid"></div>
-                        <div class="card__actions">
-                            <button class="btn btn--outline btn--sm" id="selectAllFt">Select All</button>
-                            <button class="btn btn--outline btn--sm" id="deselectAllFt">Deselect All</button>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> File Types <span class="badge" id="ftCount">0</span></h2>
+                        <div class="chip-wrap chip-wrap--sm" id="ftGrid"></div>
+                        <div class="row gap-xs mt-xs">
+                            <button class="btn btn--ghost btn--xs" id="ftAll">All</button>
+                            <button class="btn btn--ghost btn--xs" id="ftNone">None</button>
                         </div>
                     </section>
 
-                    <!-- Advanced Options -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            Advanced Options
-                        </h2>
-                        <div class="form-group">
-                            <label class="form-label" for="siteInput">Site Restriction</label>
-                            <input type="text" class="input" id="siteInput" placeholder="example.com" spellcheck="false">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="exclusionsInput">Exclusions (one per line)</label>
-                            <textarea class="textarea textarea--sm" id="exclusionsInput" rows="2"
-                                      placeholder="facebook.com&#10;youtube.com" spellcheck="false"></textarea>
-                        </div>
-                        <div class="form-row">
-                            <label class="toggle">
-                                <input type="checkbox" id="useQuotes">
-                                <span class="toggle__slider"></span>
-                                <span class="toggle__label">Exact match (quotes)</span>
-                            </label>
-                        </div>
-                        <div class="form-row">
-                            <label class="toggle">
-                                <input type="checkbox" id="generateAll">
-                                <span class="toggle__slider"></span>
-                                <span class="toggle__label">Generate ALL combinations</span>
-                            </label>
-                        </div>
-                        <div class="form-group" id="maxResultsGroup">
-                            <label class="form-label" for="maxResults">Max Results <span class="form-label__hint">(0 = all)</span></label>
-                            <input type="number" class="input input--sm" id="maxResults" value="100" min="0" step="1">
-                        </div>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
+                        <div class="field"><label class="field__label">Site Restriction</label><input type="text" class="input-text" id="siteInput" placeholder="example.com" spellcheck="false"></div>
+                        <div class="field"><label class="field__label">Exclusions (one per line)</label><textarea class="input-area input-area--sm" id="exclInput" rows="2" placeholder="facebook.com&#10;youtube.com" spellcheck="false"></textarea></div>
+                        <label class="toggle"><input type="checkbox" id="useQuotes"><span class="toggle__track"></span><span class="toggle__text">Exact match quotes</span></label>
+                        <label class="toggle"><input type="checkbox" id="genAll"><span class="toggle__track"></span><span class="toggle__text">Generate ALL combinations</span></label>
+                        <div class="field" id="maxGroup"><label class="field__label">Max Results <span class="field__hint">(0 = all)</span></label><input type="number" class="input-text input-text--sm" id="maxResults" value="100" min="0"></div>
                     </section>
                 </div>
-
-                <div class="panel__footer">
-                    <button class="btn btn--primary btn--lg btn--full" id="generateBtn">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        Generate Dorks
-                    </button>
+                <div class="sidebar__footer">
+                    <button class="btn btn--primary btn--lg btn--block" id="genBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate Dorks</button>
                 </div>
             </aside>
 
-            <div class="resize-handle" id="resizeHandle" title="Drag to resize">
-                <div class="resize-handle__dots"></div>
+            <div class="panel">
+                <div class="panel__header">
+                    <div class="panel__header-left">
+                        <h2 class="panel__title">Generated Dorks</h2>
+                        <span class="panel__count" id="genResCount">0 dorks</span>
+                    </div>
+                    <div class="panel__header-right">
+                        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="genSearch" placeholder="Filter..." spellcheck="false"></div>
+                        <button class="btn btn--ghost btn--xs" id="genSort" title="Sort">A-Z</button>
+                        <button class="btn btn--ghost btn--xs" id="genShuffle" title="Shuffle">&#x1F500;</button>
+                        <button class="btn btn--teal btn--xs" id="sendHunt" title="Send to Hunter" disabled>&#x27A1; Hunt</button>
+                        <button class="btn btn--teal btn--xs" id="sendScan" title="Send to Scanner" disabled>&#x1F6E1; Scan</button>
+                    </div>
+                </div>
+                <div class="panel__body" id="genBody">
+                    <div class="empty-state" id="genEmpty"><div class="empty-state__icon"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity=".25"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg></div><h3>No Dorks Yet</h3><p>Configure options and click <strong>Generate Dorks</strong> or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd></p></div>
+                    <div class="row-list" id="genList" style="display:none;"></div>
+                </div>
+                <div class="panel__footer">
+                    <div class="row gap-xs"><button class="btn btn--blue btn--xs" id="copyAll" disabled>Copy All</button><button class="btn btn--blue btn--xs" id="copySel" disabled>Copy Selected</button></div>
+                    <div class="row gap-xs"><button class="btn btn--teal btn--xs" id="expTxt" disabled>TXT</button><button class="btn btn--teal btn--xs" id="expCsv" disabled>CSV</button><button class="btn btn--teal btn--xs" id="expJson" disabled>JSON</button></div>
+                </div>
             </div>
-
-            <section class="panel panel--results" id="resultsPanel">
-                <div class="results-header">
-                    <div class="results-header__left">
-                        <h2 class="results-header__title">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                            Generated Dorks
-                        </h2>
-                        <span class="results-header__count" id="resultCount">0 dorks</span>
-                    </div>
-                    <div class="results-header__actions">
-                        <div class="search-box">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" class="search-box__input" id="searchInput" placeholder="Filter results..." spellcheck="false">
-                            <button class="search-box__clear" id="searchClear" title="Clear filter" style="display:none;">&times;</button>
-                        </div>
-                        <button class="btn btn--outline btn--sm btn--icon" id="sortBtn" title="Sort A-Z">A-Z</button>
-                        <button class="btn btn--outline btn--sm btn--icon" id="shuffleBtn" title="Shuffle">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
-                        </button>
-                        <button class="btn btn--green btn--sm btn--icon" id="sendToHunterBtn" title="Send dorks to Hunter" disabled>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            Hunt
-                        </button>
-                    </div>
-                </div>
-
-                <div class="warnings" id="warningsContainer" style="display:none;"></div>
-
-                <div class="results-body" id="resultsBody">
-                    <div class="results-empty" id="resultsEmpty">
-                        <div class="results-empty__icon">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
-                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                                <line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/>
-                            </svg>
-                        </div>
-                        <h3>No Dorks Generated Yet</h3>
-                        <p>Configure your options on the left and click <strong>Generate Dorks</strong> or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd>.</p>
-                    </div>
-                    <div class="results-list" id="resultsList" style="display:none;"></div>
-                </div>
-
-                <div class="results-footer">
-                    <div class="results-footer__left">
-                        <button class="btn btn--blue btn--sm" id="copyAllBtn" disabled>Copy All</button>
-                        <button class="btn btn--blue btn--sm" id="copySelectedBtn" disabled>Copy Selected</button>
-                    </div>
-                    <div class="results-footer__right">
-                        <button class="btn btn--green btn--sm" id="exportTxtBtn" disabled>TXT</button>
-                        <button class="btn btn--green btn--sm" id="exportCsvBtn" disabled>CSV</button>
-                        <button class="btn btn--green btn--sm" id="exportJsonBtn" disabled>JSON</button>
-                    </div>
-                </div>
-            </section>
         </div>
 
-        <!-- =============================== -->
-        <!-- HUNTER MODE -->
-        <!-- =============================== -->
-        <div id="modeHunter" class="mode-content">
-            <aside class="panel panel--config" id="hunterConfigPanel">
-                <div class="panel__scroll">
-                    <!-- Dork Input -->
+        <!-- ====================== HUNTER ====================== -->
+        <div id="modeHunter" class="mode">
+            <aside class="sidebar" id="huntSidebar">
+                <div class="sidebar__scroll">
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            Dork Queries
-                            <span class="badge" id="hunterDorkCount">0</span>
-                        </h2>
-                        <p class="card__hint">Enter dork queries to search (one per line). Or use the Generator to create them first.</p>
-                        <textarea class="textarea" id="hunterDorksInput" rows="8"
-                                  placeholder='inurl:admin intitle:"login"&#10;intitle:"index of" "parent directory"&#10;site:example.com filetype:pdf'
-                                  spellcheck="false"></textarea>
-                        <div class="card__actions">
-                            <label class="btn btn--outline btn--sm" title="Upload dorks from .txt file">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                                Upload TXT
-                                <input type="file" id="hunterFileUpload" accept=".txt" hidden>
-                            </label>
-                            <button class="btn btn--outline btn--sm" id="hunterClearDorks">Clear</button>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Dork Queries <span class="badge" id="huntDorkCount">0</span></h2>
+                        <p class="hint">Enter dorks to search (one per line), or generate them in the Generator tab first.</p>
+                        <textarea class="input-area" id="huntDorks" rows="7" placeholder='inurl:admin intitle:"login"&#10;intitle:"index of" "parent directory"' spellcheck="false"></textarea>
+                        <div class="row gap-xs mt-xs">
+                            <label class="btn btn--ghost btn--xs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload<input type="file" id="huntFileUpload" accept=".txt" hidden></label>
+                            <button class="btn btn--ghost btn--xs" id="huntClearDorks">Clear</button>
                         </div>
                     </section>
 
-                    <!-- Free Engines (no API key) -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-                            Free Engines
-                            <span class="badge badge--free">NO API KEY</span>
-                        </h2>
-                        <p class="card__hint">These engines scrape search results directly. No API keys needed.</p>
-                        <div class="chip-grid" id="hunterFreeEngineGrid">
-                            <button class="chip chip--active" data-engine="duckduckgo">DuckDuckGo</button>
-                            <button class="chip chip--active" data-engine="bing">Bing</button>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Free Engines <span class="badge badge--green">NO KEY</span></h2>
+                        <div class="chip-wrap" id="huntEngines">
+                            <button class="chip chip--on" data-engine="duckduckgo">DuckDuckGo</button>
+                            <button class="chip chip--on" data-engine="bing">Bing</button>
                             <button class="chip" data-engine="yahoo">Yahoo</button>
                             <button class="chip" data-engine="google">Google</button>
                             <button class="chip" data-engine="ask">Ask.com</button>
                         </div>
                     </section>
 
-                    <!-- API Engines (require API key) -->
                     <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                            API Engines
-                            <span class="badge badge--api">API KEY</span>
-                        </h2>
-                        <p class="card__hint">These engines use API keys. Configure keys in Settings tab.</p>
-                        <div class="chip-grid" id="hunterApiEngineGrid">
-                            <button class="chip" data-engine="serper" id="serperChip">
-                                Serper.dev (Google)
-                                <span class="chip__status chip__status--no-key" id="serperStatus">No Key</span>
-                            </button>
-                        </div>
-                    </section>
-
-                    <!-- Search Options -->
-                    <section class="card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                            Search Options
-                        </h2>
-                        <div class="form-group">
-                            <label class="form-label">Pages per Dork</label>
-                            <input type="number" class="input input--sm" id="hunterPages" value="1" min="1" max="5">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Max Concurrency</label>
-                            <input type="number" class="input input--sm" id="hunterConcurrency" value="3" min="1" max="10">
-                        </div>
-                        <div class="form-row">
-                            <label class="toggle">
-                                <input type="checkbox" id="hunterUseProxy">
-                                <span class="toggle__slider"></span>
-                                <span class="toggle__label">Use Proxies</span>
-                                <span class="badge badge--sm" id="proxyCountBadge" style="margin-left:0.3rem;">0</span>
-                            </label>
-                        </div>
-                        <p class="card__hint" id="proxyHint" style="display:none;">Proxy mode enabled. API keys will NOT be used. Configure proxies in Settings.</p>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
+                        <div class="field"><label class="field__label">Pages per Dork</label><input type="number" class="input-text input-text--sm" id="huntPages" value="1" min="1" max="5"></div>
+                        <div class="field"><label class="field__label">Concurrency</label><input type="number" class="input-text input-text--sm" id="huntConc" value="3" min="1" max="10"></div>
                     </section>
                 </div>
-
-                <div class="panel__footer">
-                    <button class="btn btn--primary btn--lg btn--full" id="hunterSearchBtn">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        Start Hunting
-                    </button>
+                <div class="sidebar__footer">
+                    <button class="btn btn--primary btn--lg btn--block" id="huntBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Start Hunting</button>
                 </div>
             </aside>
 
-            <div class="resize-handle" id="hunterResizeHandle" title="Drag to resize">
-                <div class="resize-handle__dots"></div>
+            <div class="panel">
+                <div class="panel__header">
+                    <div class="panel__header-left"><h2 class="panel__title">Extracted URLs</h2><span class="panel__count" id="huntUrlCount">0 URLs</span></div>
+                    <div class="panel__header-right">
+                        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="huntSearch" placeholder="Filter URLs..." spellcheck="false"></div>
+                        <button class="btn btn--teal btn--xs" id="sendUrlsToScan" title="Send URLs to Scanner" disabled>&#x1F6E1; Scan</button>
+                    </div>
+                </div>
+                <div class="progress-bar" id="huntProgress" style="display:none;"><div class="progress-bar__fill" id="huntProgressFill"></div><div class="progress-bar__info"><span id="huntProgressText">Searching...</span><span id="huntProgressNum">0 URLs</span></div></div>
+                <div class="panel__body" id="huntBody">
+                    <div class="empty-state" id="huntEmpty"><div class="empty-state__icon"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity=".25"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h3>No URLs Yet</h3><p>Enter dork queries and click <strong>Start Hunting</strong></p></div>
+                    <div class="row-list" id="huntList" style="display:none;"></div>
+                </div>
+                <div class="panel__footer">
+                    <div class="row gap-xs"><button class="btn btn--blue btn--xs" id="huntCopyAll" disabled>Copy All URLs</button></div>
+                    <div class="row gap-xs"><button class="btn btn--teal btn--xs" id="huntExpTxt" disabled>TXT</button><button class="btn btn--teal btn--xs" id="huntExpCsv" disabled>CSV</button><button class="btn btn--teal btn--xs" id="huntExpJson" disabled>JSON</button></div>
+                </div>
             </div>
-
-            <!-- Hunter Results -->
-            <section class="panel panel--results" id="hunterResultsPanel">
-                <div class="results-header">
-                    <div class="results-header__left">
-                        <h2 class="results-header__title">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
-                            Extracted URLs
-                        </h2>
-                        <span class="results-header__count" id="hunterUrlCount">0 URLs</span>
-                    </div>
-                    <div class="results-header__actions">
-                        <div class="search-box">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" class="search-box__input" id="hunterSearchInput" placeholder="Filter URLs..." spellcheck="false">
-                            <button class="search-box__clear" id="hunterSearchClear" title="Clear filter" style="display:none;">&times;</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Progress bar for streaming -->
-                <div class="hunt-progress" id="huntProgress" style="display:none;">
-                    <div class="hunt-progress__bar">
-                        <div class="hunt-progress__fill" id="huntProgressFill"></div>
-                    </div>
-                    <div class="hunt-progress__info">
-                        <span id="huntProgressText">Searching...</span>
-                        <span id="huntProgressCount">0 URLs found</span>
-                    </div>
-                </div>
-
-                <div class="results-body" id="hunterResultsBody">
-                    <div class="results-empty" id="hunterResultsEmpty">
-                        <div class="results-empty__icon">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
-                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            </svg>
-                        </div>
-                        <h3>No URLs Extracted Yet</h3>
-                        <p>Enter dork queries and click <strong>Start Hunting</strong> to extract URLs from search engines.</p>
-                    </div>
-                    <div class="results-list" id="hunterResultsList" style="display:none;"></div>
-                </div>
-
-                <div class="results-footer">
-                    <div class="results-footer__left">
-                        <button class="btn btn--blue btn--sm" id="hunterCopyAllBtn" disabled>Copy All URLs</button>
-                    </div>
-                    <div class="results-footer__right">
-                        <button class="btn btn--green btn--sm" id="hunterExportTxtBtn" disabled>TXT</button>
-                        <button class="btn btn--green btn--sm" id="hunterExportCsvBtn" disabled>CSV</button>
-                        <button class="btn btn--green btn--sm" id="hunterExportJsonBtn" disabled>JSON</button>
-                    </div>
-                </div>
-            </section>
         </div>
 
-        <!-- =============================== -->
-        <!-- SETTINGS MODE -->
-        <!-- =============================== -->
-        <div id="modeSettings" class="mode-content">
+        <!-- ====================== SCANNER ====================== -->
+        <div id="modeScanner" class="mode">
+            <aside class="sidebar" id="scanSidebar">
+                <div class="sidebar__scroll">
+                    <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Target URLs <span class="badge" id="scanUrlCount">0</span></h2>
+                        <p class="hint">Enter URLs with GET parameters to scan (one per line). URLs without parameters will be skipped.</p>
+                        <textarea class="input-area" id="scanUrls" rows="8" placeholder="http://example.com/page?id=1&name=test&#10;http://vuln-site.com/search?q=hello" spellcheck="false"></textarea>
+                        <div class="row gap-xs mt-xs">
+                            <label class="btn btn--ghost btn--xs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload<input type="file" id="scanFileUpload" accept=".txt" hidden></label>
+                            <button class="btn btn--ghost btn--xs" id="scanClearUrls">Clear</button>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Detection</h2>
+                        <label class="toggle"><input type="checkbox" id="scanSqli" checked><span class="toggle__track"></span><span class="toggle__text">SQL Injection (SQLi)</span></label>
+                        <label class="toggle"><input type="checkbox" id="scanXss" checked><span class="toggle__track"></span><span class="toggle__text">Cross-Site Scripting (XSS)</span></label>
+                    </section>
+
+                    <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
+                        <div class="field"><label class="field__label">Concurrency</label><input type="number" class="input-text input-text--sm" id="scanConc" value="20" min="1" max="50"></div>
+                        <div class="field"><label class="field__label">Timeout (sec)</label><input type="number" class="input-text input-text--sm" id="scanTimeout" value="10" min="1" max="60"></div>
+                        <div class="field"><label class="field__label">Rate Limit (req/s, 0=none)</label><input type="number" class="input-text input-text--sm" id="scanRate" value="50" min="0" max="200"></div>
+                    </section>
+                </div>
+                <div class="sidebar__footer">
+                    <button class="btn btn--danger btn--lg btn--block" id="scanBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Start Scan</button>
+                </div>
+            </aside>
+
+            <div class="panel">
+                <div class="panel__header">
+                    <div class="panel__header-left"><h2 class="panel__title">Scan Results</h2><span class="panel__count" id="scanResCount">0 findings</span></div>
+                    <div class="panel__header-right">
+                        <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="scanSearch" placeholder="Filter..." spellcheck="false"></div>
+                    </div>
+                </div>
+                <div class="progress-bar" id="scanProgress" style="display:none;"><div class="progress-bar__fill" id="scanProgressFill"></div><div class="progress-bar__info"><span id="scanProgressText">Scanning...</span><span id="scanProgressNum">0%</span></div></div>
+                <!-- Scan Summary -->
+                <div class="scan-summary" id="scanSummary" style="display:none;">
+                    <div class="scan-summary__item scan-summary__item--total"><span class="scan-summary__label">URLs</span><span class="scan-summary__value" id="sumUrls">0</span></div>
+                    <div class="scan-summary__item scan-summary__item--findings"><span class="scan-summary__label">Findings</span><span class="scan-summary__value" id="sumFindings">0</span></div>
+                    <div class="scan-summary__item scan-summary__item--sqli"><span class="scan-summary__label">SQLi</span><span class="scan-summary__value" id="sumSqli">0</span></div>
+                    <div class="scan-summary__item scan-summary__item--xss"><span class="scan-summary__label">XSS</span><span class="scan-summary__value" id="sumXss">0</span></div>
+                </div>
+                <div class="panel__body" id="scanBody">
+                    <div class="empty-state" id="scanEmpty"><div class="empty-state__icon"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity=".25"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3>No Scan Results</h3><p>Enter URLs with parameters and click <strong>Start Scan</strong></p></div>
+                    <div class="row-list" id="scanList" style="display:none;"></div>
+                </div>
+                <div class="panel__footer">
+                    <div class="row gap-xs"><button class="btn btn--blue btn--xs" id="scanCopyFindings" disabled>Copy Findings</button></div>
+                    <div class="row gap-xs"><button class="btn btn--teal btn--xs" id="scanExpTxt" disabled>TXT</button><button class="btn btn--teal btn--xs" id="scanExpCsv" disabled>CSV</button><button class="btn btn--teal btn--xs" id="scanExpJson" disabled>JSON</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====================== SETTINGS ====================== -->
+        <div id="modeSettings" class="mode">
             <div class="settings-page">
-                <div class="settings-page__scroll">
+                <div class="settings-page__inner">
                     <h2 class="settings-page__title">Settings</h2>
-                    <p class="settings-page__desc">Configure API keys, proxies, and other options. Changes are saved per setting.</p>
+                    <p class="hint mb-md">Configure API keys, proxies, and other options.</p>
 
-                    <!-- Current Status -->
-                    <section class="card settings-card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                            Current Status
-                        </h2>
-                        <div class="settings-status" id="settingsStatus">
-                            <div class="settings-status__item">
-                                <span class="settings-status__label">Serper API Keys</span>
-                                <span class="settings-status__value" id="statusSerperKeys">Loading...</span>
-                            </div>
-                            <div class="settings-status__item">
-                                <span class="settings-status__label">Proxy Mode</span>
-                                <span class="settings-status__value" id="statusProxyMode">Loading...</span>
-                            </div>
-                            <div class="settings-status__item">
-                                <span class="settings-status__label">Working Proxies</span>
-                                <span class="settings-status__value" id="statusProxyCount">Loading...</span>
-                            </div>
+                    <section class="card mb-md">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Status</h2>
+                        <div class="status-grid" id="statusGrid">
+                            <div class="status-row"><span>Serper API Keys</span><span id="stSerper" class="status-val status-val--off">--</span></div>
+                            <div class="status-row"><span>Proxy Mode</span><span id="stProxy" class="status-val status-val--off">Disabled</span></div>
+                            <div class="status-row"><span>Proxies</span><span id="stProxyCount" class="status-val status-val--off">0</span></div>
                         </div>
                     </section>
 
-                    <!-- API Keys -->
-                    <section class="card settings-card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                            API Keys
-                        </h2>
-                        <p class="card__hint">
-                            Enter your Serper.dev API keys (one per line). Get a free key at
-                            <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.
-                            Multiple keys enable rotation on rate limits.
-                        </p>
-                        <div class="form-group">
-                            <label class="form-label">Serper.dev API Keys</label>
-                            <textarea class="textarea" id="settingsSerperKeys" rows="3"
-                                      placeholder="Enter API keys, one per line...&#10;e.g. abc123def456..." spellcheck="false"></textarea>
-                        </div>
-                        <div class="card__actions">
-                            <button class="btn btn--blue btn--sm" id="saveApiKeysBtn">Save API Keys</button>
-                        </div>
+                    <section class="card mb-md">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> API Keys</h2>
+                        <p class="hint">Serper.dev API keys (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.</p>
+                        <textarea class="input-area" id="setSerperKeys" rows="3" placeholder="Enter API keys..." spellcheck="false"></textarea>
+                        <button class="btn btn--blue btn--sm mt-xs" id="saveKeysBtn">Save API Keys</button>
                     </section>
 
-                    <!-- Proxy Configuration -->
-                    <section class="card settings-card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                            Proxy Configuration
-                        </h2>
-                        <p class="card__hint">
-                            Configure HTTP/SOCKS proxies for scraping. When proxy mode is enabled, API keys are NOT used.
-                            Format: <code>ip:port</code> or <code>http://user:pass@ip:port</code> or <code>socks5://ip:port</code>.
-                        </p>
-                        <div class="form-row" style="margin-bottom:0.6rem;">
-                            <label class="toggle">
-                                <input type="checkbox" id="settingsProxyEnabled">
-                                <span class="toggle__slider"></span>
-                                <span class="toggle__label">Enable Proxy Mode</span>
-                            </label>
+                    <section class="card mb-md">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Proxy Configuration</h2>
+                        <p class="hint">HTTP/SOCKS proxies. Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>
+                        <label class="toggle mb-xs"><input type="checkbox" id="setProxyOn"><span class="toggle__track"></span><span class="toggle__text">Enable Proxy Mode</span></label>
+                        <textarea class="input-area" id="setProxies" rows="4" placeholder="123.45.67.89:8080&#10;socks5://127.0.0.1:1080" spellcheck="false"></textarea>
+                        <div class="row gap-xs mt-xs">
+                            <label class="btn btn--ghost btn--xs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Load File<input type="file" id="proxyFileUpload" accept=".txt" hidden></label>
+                            <button class="btn btn--warn btn--xs" id="testProxiesBtn">Test</button>
+                            <button class="btn btn--blue btn--xs" id="saveProxiesBtn">Save</button>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Proxy List</label>
-                            <textarea class="textarea" id="settingsProxies" rows="5"
-                                      placeholder="Enter proxies, one per line...&#10;e.g. 123.45.67.89:8080&#10;http://user:pass@proxy.example.com:3128&#10;socks5://127.0.0.1:1080" spellcheck="false"></textarea>
-                        </div>
-                        <div class="card__actions">
-                            <label class="btn btn--outline btn--sm" title="Load proxies from .txt file">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                                Load from File
-                                <input type="file" id="proxyFileUpload" accept=".txt" hidden>
-                            </label>
-                            <button class="btn btn--yellow btn--sm" id="testProxiesBtn">Test Proxies</button>
-                            <button class="btn btn--blue btn--sm" id="saveProxiesBtn">Save Proxies</button>
-                        </div>
-
-                        <!-- Test Results -->
-                        <div class="proxy-test-results" id="proxyTestResults" style="display:none;">
-                            <div class="proxy-test-results__header">
-                                <span id="proxyTestSummary">Testing...</span>
-                                <button class="btn btn--green btn--sm" id="saveWorkingProxiesBtn" style="display:none;">Save Working Only</button>
-                            </div>
-                            <div class="proxy-test-results__list" id="proxyTestList"></div>
-                        </div>
-                    </section>
-
-                    <!-- Info -->
-                    <section class="card settings-card">
-                        <h2 class="card__title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            How It Works
-                        </h2>
-                        <div class="settings-info">
-                            <div class="settings-info__item">
-                                <strong>Free Engines</strong> (DuckDuckGo, Bing, Yahoo, Google, Ask.com)
-                                scrape search engine HTML directly. No API keys needed but may get rate-limited.
-                            </div>
-                            <div class="settings-info__item">
-                                <strong>API Engines</strong> (Serper.dev) use paid API keys for reliable access.
-                                Get a free key at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.
-                            </div>
-                            <div class="settings-info__item">
-                                <strong>Proxy Mode</strong> routes all scraping requests through proxies.
-                                When enabled, API keys are NOT used - only free engines with proxies.
-                            </div>
+                        <div id="proxyTestBox" style="display:none;" class="mt-sm">
+                            <div class="status-row"><span id="proxyTestSummary">Testing...</span><button class="btn btn--teal btn--xs" id="saveWorkingBtn" style="display:none;">Save Working</button></div>
+                            <div id="proxyTestList" class="proxy-test-list"></div>
                         </div>
                     </section>
                 </div>
@@ -527,11 +306,11 @@
     </main>
 
     <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
-        <div class="loading-spinner">
+    <div class="overlay" id="overlay" style="display:none;">
+        <div class="overlay__box">
             <div class="spinner"></div>
-            <p id="loadingText">Processing...</p>
-            <span class="loading-spinner__sub" id="loadingSubtext">This may take a moment</span>
+            <p id="overlayTitle">Processing...</p>
+            <span class="overlay__sub" id="overlaySub">Please wait</span>
         </div>
     </div>
 

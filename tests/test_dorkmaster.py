@@ -221,7 +221,7 @@ class TestFlaskApp(unittest.TestCase):
         resp = self.client.get("/api/hunter/engines")
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
-        self.assertIn("duckduckgo", data["available"])
+        self.assertIn("duckduckgo", data["available_free"])
 
     def test_hunter_export(self):
         resp = self.client.post("/api/hunter/export", json={
@@ -229,6 +229,58 @@ class TestFlaskApp(unittest.TestCase):
             "format": "txt",
         })
         self.assertEqual(resp.status_code, 200)
+
+    def test_scanner_batch(self):
+        """Test the scanner batch API returns proper structure."""
+        resp = self.client.post("/api/scanner/scan/batch", json={
+            "urls": ["http://example.com/page?id=1"],
+            "detect_sqli": True,
+            "detect_xss": True,
+            "max_concurrency": 2,
+            "timeout": 5,
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertIn("summary", data)
+        self.assertIn("results", data)
+        self.assertIn("total_urls", data["summary"])
+
+    def test_scanner_batch_no_urls(self):
+        """Test scanner returns error with no URLs."""
+        resp = self.client.post("/api/scanner/scan/batch", json={
+            "urls": [],
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_scanner_export_json(self):
+        """Test scanner export in JSON format."""
+        resp = self.client.post("/api/scanner/export", json={
+            "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
+            "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
+            "format": "json",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("application/json", resp.content_type)
+
+    def test_scanner_export_txt(self):
+        """Test scanner export in TXT format."""
+        resp = self.client.post("/api/scanner/export", json={
+            "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
+            "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
+            "format": "txt",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/plain", resp.content_type)
+
+    def test_scanner_export_csv(self):
+        """Test scanner export in CSV format."""
+        resp = self.client.post("/api/scanner/export", json={
+            "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
+            "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
+            "format": "csv",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/csv", resp.content_type)
 
 
 class TestHunterModules(unittest.TestCase):

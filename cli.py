@@ -2,8 +2,8 @@
 DorkMaster CLI - Interactive Command Line Interface
 =====================================================
 
-Unified CLI combining dork generation (DorkBoxer) and
-dork hunting (DorkHunter) into a single interactive tool.
+Unified CLI combining dork generation (DorkBoxer), dork hunting (DorkHunter),
+and security scanning (SQLi/XSS) into a single interactive tool.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ from core.engine import DorkConfig, DorkGenerator
 from hunter.config import HunterConfig
 from hunter.search.free_engine import FreeSearchEngine, AVAILABLE_ENGINES
 from hunter.orchestrator import load_dorks_from_file
+from scanner.models import ScanConfig, ScanReport, ScanStatus, Confidence
+from scanner.orchestrator import ScanOrchestrator
 
 # ---------------------------------------------------------------------------
 # ANSI helpers
@@ -101,8 +103,8 @@ def _show_banner() -> None:
     print(f"  {BOLD}{MAGENTA}  ██║ ╚═╝ ██║██║  ██║███████║   ██║   ███████╗██║  ██║{RESET}")
     print(f"  {BOLD}{MAGENTA}  ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝{RESET}")
     print()
-    print(f"  {BOLD}{WHITE}  Dork Generator & Hunter{RESET}  {DIM}v{__version__}{RESET}")
-    print(f"  {DIM}  Generate dorks, search engines, extract URLs{RESET}")
+    print(f"  {BOLD}{WHITE}  Dork Generator & Hunter & Scanner{RESET}  {DIM}v{__version__}{RESET}")
+    print(f"  {DIM}  Generate dorks, search engines, extract URLs, scan vulns{RESET}")
     print()
     print(f"  {LINE}")
     print()
@@ -123,8 +125,9 @@ def _show_menu() -> str:
         ("1", "Generate Dorks", "Create dork queries for any search engine"),
         ("2", "Hunt URLs", "Search dorks and extract URLs (free engines)"),
         ("3", "Generate & Hunt", "Generate dorks then immediately hunt"),
-        ("4", "Web Interface", "Launch the web UI in your browser"),
-        ("5", "Help", "Usage guide & tips"),
+        ("4", "Security Scan", "Scan URLs for SQLi / XSS vulnerabilities"),
+        ("5", "Web Interface", "Launch the web UI in your browser"),
+        ("6", "Help", "Usage guide & tips"),
     ]
     for num, label, desc in menu_items:
         print(
@@ -136,12 +139,12 @@ def _show_menu() -> str:
     print(f"  {RED}{BOLD}  [0] {RESET} {DIM}Exit{RESET}")
     print()
 
-    valid = {"0", "1", "2", "3", "4", "5"}
+    valid = {"0", "1", "2", "3", "4", "5", "6"}
     while True:
         choice = _ask("Select an operation")
         if choice in valid:
             return choice
-        print(f"  {RED}  [!] Invalid choice. Enter 0-5.{RESET}")
+        print(f"  {RED}  [!] Invalid choice. Enter 0-6.{RESET}")
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +183,7 @@ def _run_generate() -> list[str]:
     # Keywords
     print()
     print(f"  {WHITE}  Enter keywords (one per line, empty line to finish):{RESET}")
-    keywords = []
+    keywords: list[str] = []
     while True:
         try:
             line = input(f"  {CYAN}  kw> {RESET}").strip()
@@ -211,7 +214,7 @@ def _run_generate() -> list[str]:
     if raw.lower().strip() == "a":
         selected_ops = op_keys[:]
     else:
-        selected_ops = []
+        selected_ops: list[str] = []
         for part in raw.split(","):
             part = part.strip()
             try:
@@ -226,7 +229,7 @@ def _run_generate() -> list[str]:
 
     # Filetypes
     filetypes = config.get_filetypes(engine_id)
-    selected_ft = []
+    selected_ft: list[str] = []
     if filetypes:
         use_ft = _ask_yes_no("Include file types?", default=False)
         if use_ft:
@@ -322,13 +325,11 @@ def _run_hunt(dorks: list[str] | None = None) -> list[str]:
             p = Path(fpath).expanduser().resolve()
             if p.is_file():
                 dorks = load_dorks_from_file(str(p))
+            elif Path(fpath).is_file():
+                dorks = load_dorks_from_file(fpath)
             else:
-                # Try relative to CWD
-                if Path(fpath).is_file():
-                    dorks = load_dorks_from_file(fpath)
-                else:
-                    print(f"  {RED}  [!] File not found: {fpath}{RESET}")
-                    return []
+                print(f"  {RED}  [!] File not found: {fpath}{RESET}")
+                return []
 
     if not dorks:
         print(f"  {RED}  [!] No dorks provided.{RESET}")
@@ -357,7 +358,7 @@ def _run_hunt(dorks: list[str] | None = None) -> list[str]:
     if raw.lower().strip() == "a":
         engines = list(AVAILABLE_ENGINES)
     else:
-        engines = []
+        engines: list[str] = []
         for part in raw.split(","):
             part = part.strip()
             try:
@@ -470,9 +471,9 @@ def _run_scan(urls: list[str] | None = None) -> None:
             fpath = _ask("Path to URLs file", "extracted_urls.txt")
             p = Path(fpath).expanduser().resolve()
             if p.is_file():
-                urls = [l.strip() for l in p.read_text().splitlines() if l.strip()]
+                urls = [line.strip() for line in p.read_text().splitlines() if line.strip()]
             elif Path(fpath).is_file():
-                urls = [l.strip() for l in Path(fpath).read_text().splitlines() if l.strip()]
+                urls = [line.strip() for line in Path(fpath).read_text().splitlines() if line.strip()]
             else:
                 print(f"  {RED}  [!] File not found: {fpath}{RESET}")
                 return
@@ -583,7 +584,7 @@ def _run_web() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 5. Help
+# 6. Help
 # ---------------------------------------------------------------------------
 
 def _show_help() -> None:
@@ -608,18 +609,19 @@ def _show_help() -> None:
     print(f"  - De-duplication and junk filtering")
     print(f"  - Export URLs to TXT, CSV, JSON{RESET}")
     print()
-    print(f"  {WHITE}{BOLD}  Web Interface:{RESET}")
-    print(f"  {DIM}  - Modern dark UI with tabbed Generator/Hunter")
-    print(f"  - Real-time combination counter")
-    print(f"  - Send generated dorks directly to Hunter")
-    print(f"  - Syntax highlighting for dork queries{RESET}")
-    print()
     print(f"  {WHITE}{BOLD}  Security Scanner:{RESET}")
     print(f"  {DIM}  - Safe, detection-based analysis (no exploit payloads)")
     print(f"  - SQL Injection (SQLi) heuristic detection")
     print(f"  - Cross-Site Scripting (XSS) reflection detection")
     print(f"  - Async with configurable concurrency & rate-limiting")
     print(f"  - Output: CLI + JSON + TXT + CSV reports{RESET}")
+    print()
+    print(f"  {WHITE}{BOLD}  Web Interface:{RESET}")
+    print(f"  {DIM}  - Modern dark UI with tabbed Generator/Hunter/Scanner")
+    print(f"  - Real-time combination counter")
+    print(f"  - Send generated dorks directly to Hunter")
+    print(f"  - Send extracted URLs directly to Scanner")
+    print(f"  - Syntax highlighting for dork queries{RESET}")
     print()
     input(f"  {DIM}  Press Enter to return...{RESET}")
 

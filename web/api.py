@@ -5,6 +5,7 @@ DorkMaster Web - API Routes
 Handles JSON API endpoints for:
   - Generator: dork generation, counting, export
   - Hunter: search with real-time streaming (SSE), export
+  - Scanner: security scan for SQLi/XSS
   - Settings: API keys, proxies, configuration
 """
 
@@ -31,6 +32,8 @@ from hunter.config import (
 from hunter.search.free_engine import FreeSearchEngine, AVAILABLE_ENGINES
 from hunter.search.engine import SearchEngine
 from hunter.search.key_manager import KeyManager, KeyExhaustedError
+from scanner.models import ScanConfig, ScanStatus
+from scanner.orchestrator import ScanOrchestrator
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -465,6 +468,257 @@ def hunter_export():
         )
 
     return jsonify({"error": f"Unknown format: {fmt}"}), 400
+
+
+# ================================================================
+# Scanner API
+# ================================================================
+
+@api_bp.route("/scanner/scan", methods=["POST"])
+def scanner_scan():
+    """Run a security scan on provided URLs.
+
+    Returns an SSE stream with scan progress and results.
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No JSON data provided."}), 400
+
+    urls = data.get("urls", [])
+    if isinstance(urls, str):
+        urls = [u.strip() for u in urls.split("\n") if u.strip()]
+
+    if not urls:
+        return jsonify({"error": "No URLs provided."}), 400
+
+    detect_sqli = data.get("detect_sqli", True)
+    detect_xss = data.get("detect_xss", True)
+    max_concurrency = data.get("max_concurrency", 20)
+    timeout_seconds = data.get("timeout", 10)
+    rate_limit_rps = data.get("rate_limit", 50)
+
+    try:
+        max_concurrency = max(1, min(50, int(max_concurrency)))
+        timeout_seconds = max(1, min(60, int(timeout_seconds)))
+        rate_limit_rps = max(0, min(200, int(rate_limit_rps)))
+    except (ValueError, TypeError):
+        max_concurrency = 20
+        timeout_seconds = 10
+        rate_limit_rps = 50
+
+    config = ScanConfig(
+        max_concurrency=max_concurrency,
+        timeout_seconds=float(timeout_seconds),
+        rate_limit_rps=float(rate_limit_rps),
+        detect_sqli=detect_sqli,
+        detect_xss=detect_xss,
+        output_dir="scan_results",
+    )
+
+    def generate_events():
+        """Generator that yields SSE events for scan progress."""
+        import queue
+        import threading
+
+        result_queue = queue.Queue()
+
+        def on_progress(current, total, url):
+            result_queue.put(("progress", {
+                "current": current,
+                "total": total,
+                "url": url,
+                "percent": round(current / total * 100, 1) if total else 0,
+            }))
+
+        def run_scan():
+            loop = asyncio.new_event_loop()
+            try:
+                orchestrator = ScanOrchestrator(config)
+                report = loop.run_until_complete(
+                    orchestrator.scan(urls, on_progress=on_progress)
+                )
+                result_queue.put(("done", report.to_dict()))
+            except Exception as exc:
+                result_queue.put(("error", str(exc)))
+            finally:
+                result_queue.put(None)
+                loop.close()
+
+        thread = threading.Thread(target=run_scan, daemon=True)
+        thread.start()
+
+        while True:
+            try:
+                item = result_queue.get(timeout=300)
+            except queue.Empty:
+                yield "event: error\ndata: {\"error\": \"Scan timed out\"}\n\n"
+                break
+
+            if item is None:
+                break
+
+            event_type, event_data = item
+            if event_type == "progress":
+                yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
+            elif event_type == "done":
+                yield f"event: done\ndata: {json.dumps(event_data)}\n\n"
+            elif event_type == "error":
+                yield f"event: error\ndata: {json.dumps({'error': event_data})}\n\n"
+
+        thread.join(timeout=5)
+
+    return Response(
+        stream_with_context(generate_events()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@api_bp.route("/scanner/scan/batch", methods=["POST"])
+def scanner_scan_batch():
+    """Run a security scan and return complete results (non-streaming)."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No JSON data provided."}), 400
+
+    urls = data.get("urls", [])
+    if isinstance(urls, str):
+        urls = [u.strip() for u in urls.split("\n") if u.strip()]
+
+    if not urls:
+        return jsonify({"error": "No URLs provided."}), 400
+
+    detect_sqli = data.get("detect_sqli", True)
+    detect_xss = data.get("detect_xss", True)
+    max_concurrency = data.get("max_concurrency", 20)
+    timeout_seconds = data.get("timeout", 10)
+    rate_limit_rps = data.get("rate_limit", 50)
+
+    try:
+        max_concurrency = max(1, min(50, int(max_concurrency)))
+        timeout_seconds = max(1, min(60, int(timeout_seconds)))
+        rate_limit_rps = max(0, min(200, int(rate_limit_rps)))
+    except (ValueError, TypeError):
+        max_concurrency = 20
+        timeout_seconds = 10
+        rate_limit_rps = 50
+
+    config = ScanConfig(
+        max_concurrency=max_concurrency,
+        timeout_seconds=float(timeout_seconds),
+        rate_limit_rps=float(rate_limit_rps),
+        detect_sqli=detect_sqli,
+        detect_xss=detect_xss,
+        output_dir="scan_results",
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        orchestrator = ScanOrchestrator(config)
+        report = loop.run_until_complete(orchestrator.scan(urls))
+    finally:
+        loop.close()
+
+    return jsonify(report.to_dict())
+
+
+@api_bp.route("/scanner/export", methods=["POST"])
+def scanner_export():
+    """Export scan results in various formats."""
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No JSON data provided."}), 400
+
+    results = data.get("results", [])
+    fmt = data.get("format", "json")
+
+    if not results:
+        return jsonify({"error": "No results to export."}), 400
+
+    if fmt == "json":
+        return Response(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            mimetype="application/json",
+            headers={
+                "Content-Disposition": "attachment; filename=scan_report.json"
+            },
+        )
+
+    if fmt == "txt":
+        lines = ["=" * 70, "  DORKMASTER SECURITY SCAN REPORT", "=" * 70, ""]
+        summary = data.get("summary", {})
+        lines.append(f"  Scanned URLs:   {summary.get('total_urls', 0)}")
+        lines.append(f"  Total Findings: {summary.get('total_findings', 0)}")
+        for vtype, count in sorted(summary.get("vuln_counts", {}).items()):
+            lines.append(f"    - {vtype}: {count}")
+        lines.append("")
+        lines.append("-" * 70)
+
+        for res in results:
+            if res.get("status") == "clean" and not res.get("findings"):
+                continue
+            lines.append("")
+            lines.append(f"  URL: {res.get('url', 'N/A')}")
+            lines.append(f"  Status: {res.get('status', 'N/A')}")
+            if res.get("error"):
+                lines.append(f"  Error: {res['error']}")
+            for f in res.get("findings", []):
+                lines.append(
+                    f"    [{f.get('confidence', '?').upper():^6}] "
+                    f"{f.get('vuln_type', '?')} | param={f.get('parameter', '?')}"
+                )
+                lines.append(f"           {f.get('evidence', '')}")
+            lines.append(f"  {'- ' * 35}")
+
+        lines.extend(["", "=" * 70])
+        return Response(
+            "\n".join(lines) + "\n",
+            mimetype="text/plain",
+            headers={
+                "Content-Disposition": "attachment; filename=scan_report.txt"
+            },
+        )
+
+    if fmt == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "#", "url", "status", "vuln_type", "confidence",
+            "parameter", "evidence", "http_code", "response_ms",
+        ])
+        idx = 0
+        for res in results:
+            findings = res.get("findings", [])
+            if not findings:
+                idx += 1
+                writer.writerow([
+                    idx, res.get("url", ""), res.get("status", ""),
+                    "", "", "", "", "", "",
+                ])
+            else:
+                for f in findings:
+                    idx += 1
+                    writer.writerow([
+                        idx, f.get("url", res.get("url", "")),
+                        res.get("status", ""),
+                        f.get("vuln_type", ""),
+                        f.get("confidence", ""),
+                        f.get("parameter", ""),
+                        f.get("evidence", ""),
+                        f.get("response_code", ""),
+                        f.get("response_time_ms", ""),
+                    ])
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=scan_report.csv"
+            },
+        )
 
 
 # ================================================================
