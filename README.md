@@ -96,8 +96,9 @@ python cli.py
 | 1 | **Generate Dorks** | Create dork queries for any search engine |
 | 2 | **Hunt URLs** | Search dorks and extract URLs (free engines) |
 | 3 | **Generate & Hunt** | Generate dorks then immediately hunt |
-| 4 | **Web Interface** | Launch the web UI |
-| 5 | **Help** | Usage guide |
+| 4 | **Security Scan** | Scan URLs for SQLi / XSS vulnerabilities |
+| 5 | **Web Interface** | Launch the web UI |
+| 6 | **Help** | Usage guide |
 
 ## Web UI Features
 
@@ -119,13 +120,21 @@ Environment variables (or `.env` file):
 | `FREE_SEARCH_ENGINES` | `duckduckgo,bing` | Default engines for free mode |
 | `SEARCH_MAX_THREADS` | `10` | Max concurrent threads |
 
+### Scanner Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCAN_MAX_CONCURRENCY` | `20` | Max concurrent scan requests |
+| `SCAN_TIMEOUT` | `10` | Per-request timeout (seconds) |
+| `SCAN_RATE_LIMIT_RPS` | `50` | Rate limit (requests/sec, 0=unlimited) |
+
 ## Tests
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-All 34 tests pass covering: config, builder, validator, generator, Flask API, hunter modules.
+All 80+ tests pass covering: config, builder, validator, generator, Flask API, hunter modules, scanner models, SQLi detector, XSS detector, orchestrator, reporting.
 
 ## License
 
