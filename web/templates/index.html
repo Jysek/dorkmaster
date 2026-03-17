@@ -176,18 +176,42 @@
                         </div>
                     </section>
 
+                    <!-- SEARCH MODE SELECTION -->
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Search Mode</h2>
-                        <div class="chip-wrap mb-xs">
-                            <button class="chip chip--on" id="huntModeFree" data-mode="free">Free Engines</button>
-                            <button class="chip" id="huntModeApi" data-mode="api">API (Serper)</button>
+
+                        <!-- FREE MODE -->
+                        <div class="mode-card mode-card--active" id="huntModeCardFree" data-mode="free">
+                            <div class="mode-card__header">
+                                <span class="mode-card__badge mode-card__badge--free">FREE</span>
+                                <span class="mode-card__title">Direct Scraping</span>
+                            </div>
+                            <p class="mode-card__desc">Scrape search engines directly. No API key, no limits.</p>
                         </div>
-                        <label class="toggle mb-xs"><input type="checkbox" id="huntUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
-                        <p class="hint" id="huntModeHint">Free mode: scrape search engines directly. No API key needed.</p>
+
+                        <!-- PREMIUM MODE -->
+                        <div class="mode-card" id="huntModeCardApi" data-mode="api">
+                            <div class="mode-card__header">
+                                <span class="mode-card__badge mode-card__badge--premium">PREMIUM</span>
+                                <span class="mode-card__title">Serper.dev API</span>
+                            </div>
+                            <p class="mode-card__desc">Google results via API. 2500 queries/key.</p>
+                            <div class="quota-bar" id="quotaBarHunter" style="display:none;">
+                                <div class="quota-bar__track"><div class="quota-bar__fill" id="quotaFillHunter"></div></div>
+                                <div class="quota-bar__info">
+                                    <span id="quotaTextHunter">0 / 0 queries</span>
+                                    <span id="quotaRemHunter">0 remaining</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="toggle mt-xs"><input type="checkbox" id="huntUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
                     </section>
 
+                    <!-- FREE ENGINES (shown in free mode) -->
                     <section class="card" id="huntFreeEnginesCard">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Free Engines <span class="badge badge--green">NO KEY</span></h2>
+                        <p class="hint">All engines below are 100% free, no API key, no limits.</p>
                         <div class="chip-wrap" id="huntEngines">
                             <button class="chip chip--on" data-engine="duckduckgo">DuckDuckGo</button>
                             <button class="chip chip--on" data-engine="bing">Bing</button>
@@ -292,8 +316,9 @@
             <div class="settings-page">
                 <div class="settings-page__inner">
                     <h2 class="settings-page__title">Settings</h2>
-                    <p class="hint mb-md">Configure API keys, proxies, and other options.</p>
+                    <p class="hint mb-md">Configure API keys, proxies, and monitor your quota.</p>
 
+                    <!-- STATUS -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Status</h2>
                         <div class="status-grid" id="statusGrid">
@@ -303,13 +328,40 @@
                         </div>
                     </section>
 
+                    <!-- QUOTA TRACKER -->
                     <section class="card mb-md">
-                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> API Keys</h2>
-                        <p class="hint">Serper.dev API keys (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>. Required for API mode in Hunter.</p>
-                        <textarea class="input-area" id="setSerperKeys" rows="3" placeholder="Enter API keys..." spellcheck="false"></textarea>
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> API Query Quota <span class="badge badge--green" id="quotaBadge">0 left</span></h2>
+                        <p class="hint">Each Serper.dev key = 2,500 free queries. Monitor your usage below.</p>
+                        <div class="quota-overview" id="quotaOverview">
+                            <div class="quota-overview__stat">
+                                <span class="quota-overview__label">Total Capacity</span>
+                                <span class="quota-overview__value" id="quotaCapacity">0</span>
+                            </div>
+                            <div class="quota-overview__stat">
+                                <span class="quota-overview__label">Used</span>
+                                <span class="quota-overview__value quota-overview__value--used" id="quotaUsed">0</span>
+                            </div>
+                            <div class="quota-overview__stat">
+                                <span class="quota-overview__label">Remaining</span>
+                                <span class="quota-overview__value quota-overview__value--remaining" id="quotaRemaining">0</span>
+                            </div>
+                        </div>
+                        <div class="quota-bar mt-xs">
+                            <div class="quota-bar__track"><div class="quota-bar__fill" id="quotaFillSettings"></div></div>
+                        </div>
+                        <div id="quotaKeyList" class="mt-xs"></div>
+                        <button class="btn btn--warn btn--xs mt-xs" id="resetQuotaBtn">Reset All Counters</button>
+                    </section>
+
+                    <!-- API KEYS -->
+                    <section class="card mb-md">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> API Keys <span class="badge badge--premium">PREMIUM</span></h2>
+                        <p class="hint">Serper.dev API keys for PREMIUM search mode (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.</p>
+                        <textarea class="input-area" id="setSerperKeys" rows="3" placeholder="Enter API keys (one per line)..." spellcheck="false"></textarea>
                         <button class="btn btn--blue btn--sm mt-xs" id="saveKeysBtn">Save API Keys</button>
                     </section>
 
+                    <!-- PROXY -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Proxy Configuration</h2>
                         <p class="hint">HTTP/SOCKS proxies for Hunter and Scanner. Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>

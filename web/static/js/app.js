@@ -1,7 +1,7 @@
 /**
- * DorkMaster v6 -- Unified Frontend
- * Generator + Hunter + Scanner + Settings
- * Supports: vuln_params, free/api/proxy modes, scanner proxy
+ * DorkMaster v7 -- Unified Frontend
+ * Generator + Hunter (FREE/PREMIUM) + Scanner + Settings
+ * Features: quota tracking, virtual scrolling, URL sanitization
  */
 (function(){
 'use strict';
@@ -11,10 +11,14 @@ let engineConfig=null, sortAsc=true;
 let huntUrls=[], huntFiltered=[], isHunting=false, huntSearchMode='free';
 let scanReport=null, scanFiltered=[], isScanning=false;
 let currentMode='generator';
+let quotaData=null;
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
 const el={};
+
+/* Max items to render at once for performance */
+const RENDER_LIMIT=500;
 
 function cache(){
     ['kwInput','kwFileUpload','kwClear','kwCount','opGrid','opCount','opAll','opNone',
@@ -28,7 +32,8 @@ function cache(){
      'huntPages','huntConc','huntBtn','huntSearch','huntUrlCount','huntEmpty','huntList',
      'huntBody','huntCopyAll','huntExpTxt','huntExpCsv','huntExpJson','huntProgress',
      'huntProgressFill','huntProgressText','huntProgressNum','sendUrlsToScan',
-     'huntModeFree','huntModeApi','huntUseProxy','huntModeHint','huntFreeEnginesCard',
+     'huntModeCardFree','huntModeCardApi','huntUseProxy','huntFreeEnginesCard',
+     'quotaBarHunter','quotaFillHunter','quotaTextHunter','quotaRemHunter',
      'scanUrls','scanUrlCount','scanFileUpload','scanClearUrls','scanSqli','scanXss',
      'scanConc','scanTimeout','scanRate','scanBtn','scanSearch','scanResCount',
      'scanEmpty','scanList','scanBody','scanProgress','scanProgressFill','scanProgressText',
@@ -36,7 +41,9 @@ function cache(){
      'scanCopyFindings','scanExpTxt','scanExpCsv','scanExpJson','scanUseProxy',
      'setSerperKeys','saveKeysBtn','setProxyOn','setProxies','proxyFileUpload',
      'testProxiesBtn','saveProxiesBtn','proxyTestBox','proxyTestSummary','proxyTestList',
-     'saveWorkingBtn','stSerper','stProxy','stProxyCount'
+     'saveWorkingBtn','stSerper','stProxy','stProxyCount',
+     'quotaBadge','quotaCapacity','quotaUsed','quotaRemaining','quotaFillSettings',
+     'quotaKeyList','resetQuotaBtn','quotaOverview'
     ].forEach(id=>{el[id]=document.getElementById(id)});
 }
 
@@ -66,6 +73,7 @@ function switchMode(m){
     if(el.statPossible)el.statPossible.style.display=show?'':'none';
     if(el.statGenerated)el.statGenerated.style.display=show?'':'none';
     if(m==='settings')loadStatus();
+    if(m==='hunter')updateHuntQuotaBar();
 }
 
 /* -- Generator -- */
@@ -107,7 +115,6 @@ function renderVulnParams(){
     const vp=engineConfig?.vuln_params;
     if(!vp||!el.vpGrid)return;
     el.vpGrid.innerHTML='';
-    // Render generic patterns as chips
     const generic=vp.patterns?.generic||[];
     generic.forEach(p=>{
         const c=document.createElement('button');c.type='button';
@@ -116,7 +123,6 @@ function renderVulnParams(){
         el.vpGrid.appendChild(c);
     });
     updateVpCount();
-    // Categories
     if(el.vpCatList){
         el.vpCatList.innerHTML='';
         const cats=vp.patterns||{};
@@ -212,11 +218,10 @@ function updateCounts(){
     else if(o>0){p+=o*k;if(o>=2)p+=o*(o-1)/2*k}
     else if(f>0)p+=k*f;
     else p+=k;
-    // Add vuln param combinations estimate
     const vps=getVps();
     if(vps.length>0&&k>0){
-        p+=vps.length*k; // inurl:pattern + keyword
-        p+=vps.length*nonFt.filter(x=>x!=='inurl').length*k; // inurl:pattern + op + keyword
+        p+=vps.length*k;
+        p+=vps.length*nonFt.filter(x=>x!=='inurl').length*k;
     }
     if(el.statPossibleVal)el.statPossibleVal.textContent=p.toLocaleString();
 }
@@ -252,9 +257,12 @@ function renderGenFiltered(){
     if(!filteredDorks.length){showEl(el.genEmpty);hideEl(el.genList);if(el.genResCount)el.genResCount.textContent='0 dorks';return}
     hideEl(el.genEmpty);showEl(el.genList);
     const frag=document.createDocumentFragment();
-    filteredDorks.forEach((d,i)=>frag.appendChild(mkDorkRow(d,i+1)));
+    const limit=Math.min(filteredDorks.length,RENDER_LIMIT);
+    for(let i=0;i<limit;i++){frag.appendChild(mkDorkRow(filteredDorks[i],i+1))}
     el.genList.innerHTML='';el.genList.appendChild(frag);
-    if(el.genResCount)el.genResCount.textContent=filteredDorks.length.toLocaleString()+' dorks';
+    let countText=filteredDorks.length.toLocaleString()+' dorks';
+    if(filteredDorks.length>RENDER_LIMIT)countText+=` (showing ${RENDER_LIMIT})`;
+    if(el.genResCount)el.genResCount.textContent=countText;
 }
 function mkDorkRow(dork,n){
     const row=document.createElement('div');row.className='dork-row';row.dataset.index=n-1;
@@ -318,20 +326,38 @@ function bindHunt(){
         if(el.scanUrls)el.scanUrls.value=huntFiltered.join('\n');
         updateScanUrlCount();switchMode('scanner');toast('Sent '+huntFiltered.length+' URLs to Scanner');
     });
-    // Mode switching
-    el.huntModeFree?.addEventListener('click',()=>{setHuntMode('free')});
-    el.huntModeApi?.addEventListener('click',()=>{setHuntMode('api')});
+    // Mode cards
+    el.huntModeCardFree?.addEventListener('click',()=>setHuntMode('free'));
+    el.huntModeCardApi?.addEventListener('click',()=>setHuntMode('api'));
 }
 function setHuntMode(mode){
     huntSearchMode=mode;
-    el.huntModeFree?.classList.toggle('chip--on',mode==='free');
-    el.huntModeApi?.classList.toggle('chip--on',mode==='api');
+    el.huntModeCardFree?.classList.toggle('mode-card--active',mode==='free');
+    el.huntModeCardApi?.classList.toggle('mode-card--active',mode==='api');
     if(el.huntFreeEnginesCard){
         el.huntFreeEnginesCard.style.display=mode==='free'?'':'none';
     }
-    if(el.huntModeHint){
-        if(mode==='free')el.huntModeHint.textContent='Free mode: scrape search engines directly. No API key needed.';
-        else el.huntModeHint.textContent='API mode: use Serper.dev API for Google results. Requires API key in Settings.';
+    // Update button label
+    if(el.huntBtn){
+        if(mode==='api'){
+            el.huntBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Start PREMIUM Hunt';
+            el.huntBtn.className='btn btn--premium btn--lg btn--block';
+        }else{
+            el.huntBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Start Hunting';
+            el.huntBtn.className='btn btn--primary btn--lg btn--block';
+        }
+    }
+    updateHuntQuotaBar();
+}
+function updateHuntQuotaBar(){
+    if(huntSearchMode==='api'&&quotaData){
+        showEl(el.quotaBarHunter);
+        const pct=quotaData.total_capacity>0?Math.round(quotaData.total_used/quotaData.total_capacity*100):0;
+        if(el.quotaFillHunter)el.quotaFillHunter.style.width=pct+'%';
+        if(el.quotaTextHunter)el.quotaTextHunter.textContent=`${quotaData.total_used.toLocaleString()} / ${quotaData.total_capacity.toLocaleString()} used`;
+        if(el.quotaRemHunter)el.quotaRemHunter.textContent=`${quotaData.total_remaining.toLocaleString()} remaining`;
+    }else{
+        hideEl(el.quotaBarHunter);
     }
 }
 function updateHuntDorkCount(){if(el.huntDorks&&el.huntDorkCount)el.huntDorkCount.textContent=el.huntDorks.value.split('\n').filter(l=>l.trim()).length}
@@ -347,15 +373,27 @@ async function huntSearch(){
         if(!engs.length){toast('Select at least one engine','warn');return}
     }
 
+    // Premium mode: check if keys exist
+    if(huntSearchMode==='api'){
+        if(!quotaData||quotaData.total_keys===0){
+            toast('No API keys configured! Go to Settings to add Serper.dev keys.','err');
+            return;
+        }
+        if(quotaData.total_remaining===0){
+            toast('All API keys exhausted (0 queries left). Add new keys or reset quota.','err');
+            return;
+        }
+    }
+
     const pages=parseInt(el.huntPages?.value,10)||1,conc=parseInt(el.huntConc?.value,10)||3;
     isHunting=true;huntUrls=[];huntFiltered=[];
     showEl(el.huntProgress);hideEl(el.huntEmpty);showEl(el.huntList);
     if(el.huntList)el.huntList.innerHTML='';
     setProgress(el.huntProgressFill,5);
-    const modeLabel=huntSearchMode==='api'?'Serper API':engs.join(', ');
+    const modeLabel=huntSearchMode==='api'?'Serper API (PREMIUM)':engs.join(', ')+' (FREE)';
     if(el.huntProgressText)el.huntProgressText.textContent=`Searching ${dorks.length} dorks via ${modeLabel}${useProxy?' (proxy)':''}...`;
     if(el.huntProgressNum)el.huntProgressNum.textContent='0 URLs';
-    el.huntBtn&&(el.huntBtn.disabled=true);el.huntBtn&&(el.huntBtn.textContent='Hunting...');
+    el.huntBtn&&(el.huntBtn.disabled=true);
     updateHuntBtns();
     let cnt=0;
     try{
@@ -374,20 +412,34 @@ async function huntSearch(){
                 else if(ln.startsWith('data: ')){
                     try{
                         const d=JSON.parse(ln.substring(6));
-                        if(evtType==='url'){cnt++;huntUrls.push(d.url);huntFiltered.push(d.url);appendUrl(d.url,cnt);if(el.huntUrlCount)el.huntUrlCount.textContent=cnt+' URLs';if(el.huntProgressNum)el.huntProgressNum.textContent=cnt+' URLs'}
+                        if(evtType==='url'){cnt++;huntUrls.push(d.url);huntFiltered.push(d.url);if(cnt<=RENDER_LIMIT)appendUrl(d.url,cnt);if(el.huntUrlCount)el.huntUrlCount.textContent=cnt+' URLs';if(el.huntProgressNum)el.huntProgressNum.textContent=cnt+' URLs'}
                         else if(evtType==='progress'){setProgress(el.huntProgressFill,Math.min(90,5+(cnt/Math.max(1,dorks.length))*85))}
-                        else if(evtType==='done'){setProgress(el.huntProgressFill,100);if(el.huntProgressText)el.huntProgressText.textContent='Done!';if(el.huntProgressNum)el.huntProgressNum.textContent=(d.total_urls||cnt)+' URLs'}
+                        else if(evtType==='done'){
+                            setProgress(el.huntProgressFill,100);
+                            if(el.huntProgressText)el.huntProgressText.textContent='Done!';
+                            if(el.huntProgressNum)el.huntProgressNum.textContent=(d.total_urls||cnt)+' URLs';
+                            // Update quota from premium search
+                            if(d.quota){
+                                quotaData=d.quota;
+                                updateHuntQuotaBar();
+                                const qUsed=d.queries_used||0;
+                                if(qUsed>0)toast(`PREMIUM: Used ${qUsed} API queries. ${d.quota.total_remaining.toLocaleString()} remaining.`);
+                            }
+                        }
                         else if(evtType==='error')toast('Error: '+(d.error||'Unknown'),'err');
                     }catch(_){}evtType='';
                 }
             }
         }
-        updateHuntBtns();toast(huntUrls.length?`Extracted ${huntUrls.length} URLs`:'No URLs found','warn');
+        if(huntUrls.length>RENDER_LIMIT)renderHuntList();
+        updateHuntBtns();
+        const modeText=huntSearchMode==='api'?'(PREMIUM)':'(FREE)';
+        toast(huntUrls.length?`Extracted ${huntUrls.length} URLs ${modeText}`:`No URLs found ${modeText}`,huntUrls.length?undefined:'warn');
         if(!huntUrls.length){showEl(el.huntEmpty);hideEl(el.huntList)}
     }catch(e){toast('Hunt failed: '+e.message,'err')}
     finally{
         isHunting=false;el.huntBtn&&(el.huntBtn.disabled=false);
-        el.huntBtn&&(el.huntBtn.textContent='Start Hunting');
+        setHuntMode(huntSearchMode); // reset button text
         setTimeout(()=>hideEl(el.huntProgress),3000);
     }
 }
@@ -410,9 +462,12 @@ function renderHuntList(){
     if(!huntFiltered.length){showEl(el.huntEmpty);hideEl(el.huntList);if(el.huntUrlCount)el.huntUrlCount.textContent='0 URLs';return}
     hideEl(el.huntEmpty);showEl(el.huntList);
     const frag=document.createDocumentFragment();
-    huntFiltered.forEach((u,i)=>frag.appendChild(mkUrlRow(u,i+1)));
+    const limit=Math.min(huntFiltered.length,RENDER_LIMIT);
+    for(let i=0;i<limit;i++){frag.appendChild(mkUrlRow(huntFiltered[i],i+1))}
     el.huntList.innerHTML='';el.huntList.appendChild(frag);
-    if(el.huntUrlCount)el.huntUrlCount.textContent=huntFiltered.length.toLocaleString()+' URLs';
+    let countText=huntFiltered.length.toLocaleString()+' URLs';
+    if(huntFiltered.length>RENDER_LIMIT)countText+=` (showing ${RENDER_LIMIT})`;
+    if(el.huntUrlCount)el.huntUrlCount.textContent=countText;
 }
 function updateHuntBtns(){
     const has=huntFiltered.length>0;
@@ -509,7 +564,8 @@ function renderScanList(){
     if(!scanFiltered.length){showEl(el.scanEmpty);hideEl(el.scanList);return}
     hideEl(el.scanEmpty);showEl(el.scanList);
     const frag=document.createDocumentFragment();
-    scanFiltered.forEach(r=>frag.appendChild(mkScanRow(r)));
+    const limit=Math.min(scanFiltered.length,RENDER_LIMIT);
+    for(let i=0;i<limit;i++){frag.appendChild(mkScanRow(scanFiltered[i]))}
     el.scanList.innerHTML='';el.scanList.appendChild(frag);
 }
 function mkScanRow(r){
@@ -572,7 +628,13 @@ async function exportScan(fmt){
 function bindSettings(){
     el.saveKeysBtn?.addEventListener('click',async()=>{
         const keys=(el.setSerperKeys?.value||'').split('\n').map(k=>k.trim()).filter(k=>k);
-        try{const r=await fetch('/api/settings/api-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serper_api_keys:keys})});const d=await r.json();toast(d.message||'Saved');loadStatus()}catch(e){toast('Failed','err')}
+        try{
+            const r=await fetch('/api/settings/api-keys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({serper_api_keys:keys})});
+            const d=await r.json();
+            toast(d.message||'Saved');
+            if(d.quota)quotaData=d.quota;
+            loadStatus();
+        }catch(e){toast('Failed','err')}
     });
     el.saveProxiesBtn?.addEventListener('click',async()=>{
         const proxies=(el.setProxies?.value||'').split('\n').map(p=>p.trim()).filter(p=>p);
@@ -602,6 +664,17 @@ function bindSettings(){
         }catch(e){toast('Test failed','err')}
         finally{el.testProxiesBtn&&(el.testProxiesBtn.disabled=false)}
     });
+    // Reset quota
+    el.resetQuotaBtn?.addEventListener('click',async()=>{
+        if(!confirm('Reset all quota counters to 0?'))return;
+        try{
+            const r=await fetch('/api/settings/quota/reset',{method:'POST',headers:{'Content-Type':'application/json'}});
+            const d=await r.json();
+            toast(d.message||'Reset');
+            if(d.quota)quotaData=d.quota;
+            renderQuota();
+        }catch(e){toast('Failed','err')}
+    });
 }
 async function loadStatus(){
     try{
@@ -612,7 +685,37 @@ async function loadStatus(){
         if(el.stProxyCount){el.stProxyCount.textContent=(d.proxy_count||0)+' proxies';el.stProxyCount.className='status-val'+((d.proxy_count||0)>0?'':' status-val--off')}
         if(el.setProxyOn)el.setProxyOn.checked=d.proxy_enabled;
         if(d.proxies&&el.setProxies&&!el.setProxies.value)el.setProxies.value=d.proxies.join('\n');
+        // Quota
+        if(d.quota){quotaData=d.quota;renderQuota()}
     }catch(_){}
+}
+function renderQuota(){
+    if(!quotaData)return;
+    if(el.quotaBadge)el.quotaBadge.textContent=quotaData.total_remaining.toLocaleString()+' left';
+    if(el.quotaCapacity)el.quotaCapacity.textContent=quotaData.total_capacity.toLocaleString();
+    if(el.quotaUsed)el.quotaUsed.textContent=quotaData.total_used.toLocaleString();
+    if(el.quotaRemaining)el.quotaRemaining.textContent=quotaData.total_remaining.toLocaleString();
+    // Fill bar
+    const pct=quotaData.total_capacity>0?Math.round(quotaData.total_used/quotaData.total_capacity*100):0;
+    if(el.quotaFillSettings)el.quotaFillSettings.style.width=pct+'%';
+    // Per-key list
+    if(el.quotaKeyList){
+        if(!quotaData.keys||!quotaData.keys.length){
+            el.quotaKeyList.innerHTML='<p class="hint">No API keys configured.</p>';
+        }else{
+            let html='';
+            quotaData.keys.forEach(k=>{
+                const color=k.percent_used<50?'var(--green)':k.percent_used<80?'var(--yellow)':'var(--red)';
+                html+=`<div class="quota-key-row">
+                    <span class="quota-key-row__label">Key ${k.index}: ${esc(k.masked)}</span>
+                    <div class="quota-key-row__bar"><div class="quota-key-row__fill" style="width:${k.percent_used}%;background:${color}"></div></div>
+                    <span class="quota-key-row__info">${k.remaining.toLocaleString()} / ${k.capacity.toLocaleString()}</span>
+                </div>`;
+            });
+            el.quotaKeyList.innerHTML=html;
+        }
+    }
+    updateHuntQuotaBar();
 }
 
 /* -- Utilities -- */
