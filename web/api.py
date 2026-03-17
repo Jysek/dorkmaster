@@ -4,16 +4,18 @@ DorkMaster Web - API Routes
 
 Handles JSON API endpoints for:
   - Generator: dork generation, counting, export, vuln_params
-  - Hunter: search with real-time streaming (SSE), API+free+proxy modes
+  - Hunter: search with real-time streaming (SSE), FREE+PREMIUM modes
   - Scanner: security scan for SQLi/XSS with optional proxy
-  - Settings: API keys, proxies, configuration
+  - Settings: API keys, proxies, quota tracking
 """
 
 import asyncio
 import csv
 import io
 import json
+import re
 import time
+from urllib.parse import urlparse
 
 import httpx
 from flask import Blueprint, Response, jsonify, request, stream_with_context
@@ -28,6 +30,7 @@ from hunter.config import (
     API_ENGINES,
     FREE_ENGINE_INFO,
     _load_persisted_settings,
+    DATA_DIR,
 )
 from hunter.search.free_engine import FreeSearchEngine, AVAILABLE_ENGINES
 from hunter.search.engine import SearchEngine
@@ -40,6 +43,9 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 # Lazy-initialized shared instances
 _config: DorkConfig | None = None
 _generator: DorkGenerator | None = None
+
+# API quota: each Serper.dev key = 2500 free queries
+QUERIES_PER_KEY = 2500
 
 
 def _get_config() -> DorkConfig:
@@ -54,6 +60,132 @@ def _get_generator() -> DorkGenerator:
     if _generator is None:
         _generator = DorkGenerator(_get_config())
     return _generator
+
+
+# ================================================================
+# URL Sanitization
+# ================================================================
+
+def _sanitize_url(url: str) -> str | None:
+    """Clean and validate a URL, removing formatting artifacts."""
+    url = url.strip()
+    url = re.sub(r'^[\s\-\*\#\>]+', '', url)
+    url = re.sub(r'[\s\)\]\>]+$', '', url)
+    url = url.strip('"').strip("'").strip('<').strip('>')
+    url = url.split('#')[0]
+    url = url.rstrip('/')
+
+    if not url:
+        return None
+
+    if not url.startswith(('http://', 'https://')):
+        if url.startswith('//'):
+            url = 'https:' + url
+        elif '.' in url and '/' in url:
+            url = 'https://' + url
+        else:
+            return None
+
+    try:
+        parsed = urlparse(url)
+        if not parsed.netloc or '.' not in parsed.netloc:
+            return None
+        clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        if parsed.query:
+            clean += f"?{parsed.query}"
+        return clean
+    except Exception:
+        return None
+
+
+def _sanitize_urls(urls: list[str]) -> list[str]:
+    """Sanitize and deduplicate a list of URLs."""
+    seen = set()
+    result = []
+    for url in urls:
+        clean = _sanitize_url(url)
+        if clean and clean not in seen:
+            seen.add(clean)
+            result.append(clean)
+    return result
+
+
+# ================================================================
+# Quota Tracker
+# ================================================================
+
+class QuotaTracker:
+    """Tracks API query usage per key. Each key = 2500 free queries."""
+
+    def __init__(self) -> None:
+        self._file = DATA_DIR / "quota.json"
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self._data: dict = self._load()
+
+    def _load(self) -> dict:
+        if self._file.is_file():
+            try:
+                with open(self._file, "r") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                pass
+        return {"keys": {}}
+
+    def _save(self) -> None:
+        with open(self._file, "w") as f:
+            json.dump(self._data, f, indent=2)
+
+    def record_usage(self, key: str, queries_used: int) -> None:
+        if key not in self._data["keys"]:
+            self._data["keys"][key] = {"used": 0}
+        self._data["keys"][key]["used"] += queries_used
+        self._save()
+
+    def get_usage(self, key: str) -> int:
+        return self._data.get("keys", {}).get(key, {}).get("used", 0)
+
+    def get_remaining(self, key: str) -> int:
+        return max(0, QUERIES_PER_KEY - self.get_usage(key))
+
+    def get_total_available(self, keys: list[str]) -> int:
+        return sum(self.get_remaining(k) for k in keys)
+
+    def get_total_used(self, keys: list[str]) -> int:
+        return sum(self.get_usage(k) for k in keys)
+
+    def reset_key(self, key: str) -> None:
+        if key in self._data.get("keys", {}):
+            self._data["keys"][key]["used"] = 0
+            self._save()
+
+    def reset_all(self, keys: list[str]) -> None:
+        for key in keys:
+            self.reset_key(key)
+
+    def to_dict(self, keys: list[str]) -> dict:
+        """Return quota info for the API response."""
+        per_key = []
+        for i, key in enumerate(keys):
+            masked = key[:6] + "..." + key[-4:] if len(key) > 12 else "***"
+            per_key.append({
+                "index": i + 1,
+                "masked": masked,
+                "used": self.get_usage(key),
+                "remaining": self.get_remaining(key),
+                "capacity": QUERIES_PER_KEY,
+                "percent_used": round(self.get_usage(key) / QUERIES_PER_KEY * 100, 1),
+            })
+        return {
+            "queries_per_key": QUERIES_PER_KEY,
+            "total_keys": len(keys),
+            "total_capacity": len(keys) * QUERIES_PER_KEY,
+            "total_used": self.get_total_used(keys),
+            "total_remaining": self.get_total_available(keys),
+            "keys": per_key,
+        }
+
+
+_quota = QuotaTracker()
 
 
 # ================================================================
@@ -273,6 +405,12 @@ def hunter_search():
             if not cfg.serper.api_keys:
                 return jsonify({"error": "No API keys configured. Add them in Settings."}), 400
 
+            # Check quota
+            remaining = _quota.get_total_available(cfg.serper.api_keys)
+            estimated = len(dorks) * pages
+            if remaining == 0:
+                return jsonify({"error": "All API keys exhausted (0 queries remaining). Add new keys or reset quota."}), 400
+
             from hunter.config import SerperConfig
             serper_cfg = SerperConfig()
             serper_cfg.api_keys = cfg.serper.api_keys
@@ -282,6 +420,16 @@ def hunter_search():
             api_engine = SearchEngine(serper_cfg, proxies=proxies)
             api_engine._get_queries = lambda: dorks  # type: ignore[assignment]
             urls = loop.run_until_complete(api_engine.search_all())
+
+            # Record usage
+            queries_made = len(dorks) * pages
+            if cfg.serper.api_keys:
+                per_key = queries_made // len(cfg.serper.api_keys)
+                remainder = queries_made % len(cfg.serper.api_keys)
+                for i, key in enumerate(cfg.serper.api_keys):
+                    usage = per_key + (1 if i < remainder else 0)
+                    if usage > 0:
+                        _quota.record_usage(key, usage)
         else:
             # Free mode
             valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
@@ -300,12 +448,20 @@ def hunter_search():
     finally:
         loop.close()
 
+    # Sanitize URLs
+    urls = _sanitize_urls(urls)
+
+    # Get updated quota
+    cfg = get_hunter_config()
+    quota_info = _quota.to_dict(cfg.serper.api_keys) if search_mode == "api" else None
+
     return jsonify({
         "urls": urls,
         "total_urls": len(urls),
         "dorks_processed": len(dorks),
         "search_mode": search_mode,
         "proxy_used": len(proxies) > 0,
+        "quota": quota_info,
     })
 
 
@@ -354,9 +510,10 @@ def hunter_search_stream():
         result_queue: queue.Queue = queue.Queue()
 
         def on_results_callback(new_urls: list[str]) -> None:
-            for url in new_urls:
+            clean_urls = _sanitize_urls(new_urls)
+            for url in clean_urls:
                 result_queue.put(("url", url))
-            result_queue.put(("progress", {"total_urls": len(new_urls)}))
+            result_queue.put(("progress", {"total_urls": len(clean_urls)}))
 
         def run_search():
             loop = asyncio.new_event_loop()
@@ -364,7 +521,14 @@ def hunter_search_stream():
                 if search_mode == "api":
                     cfg = get_hunter_config()
                     if not cfg.serper.api_keys:
-                        result_queue.put(("error", "No API keys configured."))
+                        result_queue.put(("error", "No API keys configured. Add them in Settings."))
+                        result_queue.put(None)
+                        return
+
+                    # Check quota
+                    remaining = _quota.get_total_available(cfg.serper.api_keys)
+                    if remaining == 0:
+                        result_queue.put(("error", "All API keys exhausted. Add new keys or reset quota."))
                         result_queue.put(None)
                         return
 
@@ -380,10 +544,24 @@ def hunter_search_stream():
                     urls = loop.run_until_complete(
                         api_engine.search_all(on_results=on_results_callback)
                     )
+
+                    # Record usage
+                    queries_made = len(dorks) * pages
+                    if cfg.serper.api_keys:
+                        per_key = queries_made // len(cfg.serper.api_keys)
+                        rem = queries_made % len(cfg.serper.api_keys)
+                        for i, key in enumerate(cfg.serper.api_keys):
+                            usage = per_key + (1 if i < rem else 0)
+                            if usage > 0:
+                                _quota.record_usage(key, usage)
+
+                    quota_info = _quota.to_dict(cfg.serper.api_keys)
                     result_queue.put(("done", {
                         "total_urls": api_engine.discovered_count,
                         "dorks_processed": len(dorks),
                         "search_mode": "api",
+                        "queries_used": queries_made,
+                        "quota": quota_info,
                     }))
                 else:
                     valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
@@ -406,6 +584,7 @@ def hunter_search_stream():
                         "total_urls": search_engine.discovered_count,
                         "dorks_processed": len(dorks),
                         "engines_used": valid_engines if search_mode == "free" else ["serper"],
+                        "search_mode": "free",
                     }))
             except Exception as exc:
                 result_queue.put(("error", str(exc)))
@@ -461,6 +640,9 @@ def hunter_export():
 
     if not urls:
         return jsonify({"error": "No URLs to export."}), 400
+
+    # Sanitize before export
+    urls = _sanitize_urls(urls)
 
     if fmt == "txt":
         content = "\n".join(urls) + "\n"
@@ -525,6 +707,11 @@ def scanner_scan():
 
     if not urls:
         return jsonify({"error": "No URLs provided."}), 400
+
+    # Sanitize URLs
+    urls = _sanitize_urls(urls)
+    if not urls:
+        return jsonify({"error": "No valid URLs after sanitization."}), 400
 
     detect_sqli = data.get("detect_sqli", True)
     detect_xss = data.get("detect_xss", True)
@@ -636,6 +823,8 @@ def scanner_scan_batch():
 
     if not urls:
         return jsonify({"error": "No URLs provided."}), 400
+
+    urls = _sanitize_urls(urls)
 
     detect_sqli = data.get("detect_sqli", True)
     detect_xss = data.get("detect_xss", True)
@@ -784,7 +973,10 @@ def scanner_export():
 @api_bp.route("/settings", methods=["GET"])
 def get_settings():
     """Return current settings for display."""
-    return jsonify(get_current_settings())
+    cfg = get_hunter_config(force_reload=True)
+    base = get_current_settings()
+    base["quota"] = _quota.to_dict(cfg.serper.api_keys)
+    return jsonify(base)
 
 
 @api_bp.route("/settings/api-keys", methods=["POST"])
@@ -803,10 +995,33 @@ def save_api_keys():
     persisted["serper_api_keys"] = serper_keys
     save_settings(persisted)
 
+    # Return updated quota info
+    quota_info = _quota.to_dict(serper_keys)
+
     return jsonify({
         "status": "ok",
         "message": f"Saved {len(serper_keys)} Serper API key(s).",
         "count": len(serper_keys),
+        "quota": quota_info,
+    })
+
+
+@api_bp.route("/settings/quota", methods=["GET"])
+def get_quota():
+    """Get current quota information."""
+    cfg = get_hunter_config(force_reload=True)
+    return jsonify(_quota.to_dict(cfg.serper.api_keys))
+
+
+@api_bp.route("/settings/quota/reset", methods=["POST"])
+def reset_quota():
+    """Reset all quota counters to 0."""
+    cfg = get_hunter_config(force_reload=True)
+    _quota.reset_all(cfg.serper.api_keys)
+    return jsonify({
+        "status": "ok",
+        "message": "All quota counters reset.",
+        "quota": _quota.to_dict(cfg.serper.api_keys),
     })
 
 
