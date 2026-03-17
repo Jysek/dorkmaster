@@ -437,7 +437,135 @@ def _run_generate_and_hunt() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 4. Web Interface
+# 4. Security Scan
+# ---------------------------------------------------------------------------
+
+def _run_scan(urls: list[str] | None = None) -> None:
+    print()
+    print(f"  {CYAN}{BOLD}  Security Scanner (SQLi / XSS){RESET}")
+    print(f"  {LINE_THIN}")
+    print(f"  {DIM}  Safe detection mode -- no invasive payloads.{RESET}")
+    print()
+
+    # --- Get URLs ---
+    if not urls:
+        print(f"  {WHITE}  How to provide URLs:{RESET}")
+        print(f"    {GREEN}1{RESET} Enter manually")
+        print(f"    {GREEN}2{RESET} Load from file")
+        print()
+
+        choice = _ask("Select", "2")
+        if choice == "1":
+            print(f"  {WHITE}  Enter URLs (one per line, empty to finish):{RESET}")
+            urls = []
+            while True:
+                try:
+                    line = input(f"  {CYAN}  url> {RESET}").strip()
+                except (EOFError, KeyboardInterrupt):
+                    break
+                if not line:
+                    break
+                urls.append(line)
+        else:
+            fpath = _ask("Path to URLs file", "extracted_urls.txt")
+            p = Path(fpath).expanduser().resolve()
+            if p.is_file():
+                urls = [l.strip() for l in p.read_text().splitlines() if l.strip()]
+            elif Path(fpath).is_file():
+                urls = [l.strip() for l in Path(fpath).read_text().splitlines() if l.strip()]
+            else:
+                print(f"  {RED}  [!] File not found: {fpath}{RESET}")
+                return
+
+    if not urls:
+        print(f"  {RED}  [!] No URLs provided.{RESET}")
+        return
+
+    print(f"  {GREEN}  [+] {len(urls)} URLs loaded{RESET}")
+
+    # --- Configuration ---
+    print()
+    print(f"  {CYAN}{BOLD}  Scan Configuration{RESET}")
+    print(f"  {LINE_THIN}")
+
+    concurrency = _ask_int("Max concurrency (threads)", 20)
+    timeout = _ask_int("Timeout per request (seconds)", 10)
+    rate_limit = _ask_int("Rate limit (requests/sec, 0=unlimited)", 50)
+    detect_sqli = _ask_yes_no("Detect SQL Injection?", default=True)
+    detect_xss = _ask_yes_no("Detect XSS?", default=True)
+    output_dir = _ask("Output directory", "scan_results")
+
+    config = ScanConfig(
+        max_concurrency=concurrency,
+        timeout_seconds=float(timeout),
+        rate_limit_rps=float(rate_limit),
+        detect_sqli=detect_sqli,
+        detect_xss=detect_xss,
+        output_dir=output_dir,
+    )
+
+    # --- Progress callback ---
+    def _on_progress(current: int, total: int, url: str) -> None:
+        bar_len = 30
+        filled = int(bar_len * current / total) if total else 0
+        bar = f"{GREEN}{'#' * filled}{DIM}{'-' * (bar_len - filled)}{RESET}"
+        pct = (current / total * 100) if total else 0
+        print(
+            f"\r  [{bar}] {pct:5.1f}% ({current}/{total})  "
+            f"{DIM}{url[:50]}{RESET}      ",
+            end="", flush=True,
+        )
+
+    print()
+    print(f"  {CYAN}  Starting security scan...{RESET}")
+    print()
+
+    orchestrator = ScanOrchestrator(config)
+    report = asyncio.run(orchestrator.scan_and_export(urls, on_progress=_on_progress))
+
+    # --- Results ---
+    print()  # newline after progress bar
+    print()
+    print(f"  {LINE}")
+    print(f"  {BOLD}{WHITE}  SECURITY SCAN RESULTS{RESET}")
+    print(f"  {LINE_THIN}")
+    print(f"    {WHITE}URLs Scanned:{RESET}     {GREEN}{report.total_urls}{RESET}")
+    print(f"    {WHITE}Findings:{RESET}         {_colorize_count(report.total_findings)}")
+    for vtype, count in sorted(report.vuln_counts.items()):
+        print(f"      {WHITE}{vtype}:{RESET}  {_colorize_count(count)}")
+    print(f"    {WHITE}Output:{RESET}           {GREEN}{output_dir}/{RESET}")
+
+    # Show top findings
+    vuln_results = [r for r in report.results if r.status == ScanStatus.VULNERABLE]
+    if vuln_results:
+        print()
+        print(f"  {RED}{BOLD}  Vulnerable URLs:{RESET}")
+        for r in vuln_results[:15]:
+            print(f"    {RED}*{RESET} {r.url[:75]}")
+            for f in r.findings:
+                color = RED if f.confidence in (Confidence.HIGH, Confidence.MEDIUM) else YELLOW
+                print(
+                    f"      {color}[{f.confidence.value.upper():^6}]{RESET} "
+                    f"{f.vuln_type.value} | param={f.parameter}"
+                )
+                print(f"             {DIM}{f.evidence[:80]}{RESET}")
+        if len(vuln_results) > 15:
+            print(f"    {DIM}    ... and {len(vuln_results) - 15} more{RESET}")
+    else:
+        print()
+        print(f"  {GREEN}  No vulnerabilities detected.{RESET}")
+
+    print()
+
+
+def _colorize_count(n: int) -> str:
+    if n == 0:
+        return f"{GREEN}{BOLD}0{RESET}"
+    return f"{RED}{BOLD}{n}{RESET}"
+
+
+# ---------------------------------------------------------------------------
+# 5. Web Interface
 # ---------------------------------------------------------------------------
 
 def _run_web() -> None:
@@ -464,8 +592,8 @@ def _show_help() -> None:
     print(f"  {LINE_THIN}")
     print()
     print(f"  {WHITE}{BOLD}  What is DorkMaster?{RESET}")
-    print(f"  {DIM}  A unified tool combining dork generation and URL extraction.")
-    print(f"  Generate dork queries for 8 search engines, then hunt for URLs.{RESET}")
+    print(f"  {DIM}  A unified tool combining dork generation, URL extraction,")
+    print(f"  and security scanning.  Generate dorks, hunt URLs, scan for vulns.{RESET}")
     print()
     print(f"  {WHITE}{BOLD}  Generator:{RESET}")
     print(f"  {DIM}  - Supports: Google, Bing, DuckDuckGo, Yahoo, Yandex, Baidu, Shodan, GitHub")
@@ -485,6 +613,13 @@ def _show_help() -> None:
     print(f"  - Real-time combination counter")
     print(f"  - Send generated dorks directly to Hunter")
     print(f"  - Syntax highlighting for dork queries{RESET}")
+    print()
+    print(f"  {WHITE}{BOLD}  Security Scanner:{RESET}")
+    print(f"  {DIM}  - Safe, detection-based analysis (no exploit payloads)")
+    print(f"  - SQL Injection (SQLi) heuristic detection")
+    print(f"  - Cross-Site Scripting (XSS) reflection detection")
+    print(f"  - Async with configurable concurrency & rate-limiting")
+    print(f"  - Output: CLI + JSON + TXT + CSV reports{RESET}")
     print()
     input(f"  {DIM}  Press Enter to return...{RESET}")
 
@@ -507,8 +642,9 @@ def main() -> None:
             "1": lambda: _run_generate(),
             "2": lambda: _run_hunt(),
             "3": lambda: _run_generate_and_hunt(),
-            "4": lambda: _run_web(),
-            "5": lambda: _show_help(),
+            "4": lambda: _run_scan(),
+            "5": lambda: _run_web(),
+            "6": lambda: _show_help(),
         }
 
         try:
@@ -522,7 +658,7 @@ def main() -> None:
             traceback.print_exc()
             continue
 
-        if choice not in ("4", "5", "0"):
+        if choice not in ("5", "6", "0"):
             print()
             input(f"  {DIM}  Press Enter to return to the menu...{RESET}")
 
