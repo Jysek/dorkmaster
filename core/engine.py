@@ -114,6 +114,11 @@ class DorkConfig:
     def generation_rules(self) -> Dict:
         return self._config.get("generation_rules", {})
 
+    @property
+    def vuln_params(self) -> Dict:
+        """Return vulnerable URL parameter patterns."""
+        return self._config.get("vuln_params", {})
+
     def get_engine(self, engine_id: str) -> Optional[Dict]:
         """Get full engine configuration dict, or None if not found."""
         return self.search_engines.get(engine_id)
@@ -417,6 +422,7 @@ class DorkGenerator:
         include_exclusions: Optional[List[str]] = None,
         max_results: int = 100,
         shuffle: bool = True,
+        selected_vuln_params: Optional[List[str]] = None,
     ) -> Dict:
         """Generate dork queries.
 
@@ -430,6 +436,7 @@ class DorkGenerator:
             include_exclusions: Terms to negate.
             max_results:        Max dorks to return. 0 = generate ALL.
             shuffle:            Randomize output order.
+            selected_vuln_params: Vulnerable URL patterns (e.g., '.php?id=1').
 
         Returns:
             Dict with keys: dorks, total_generated, total_possible,
@@ -561,7 +568,46 @@ class DorkGenerator:
                 )
                 all_dorks.append(dork)
 
-        # Strategy 2: Multi-operator pairs (2 different operators + keyword)
+        # Strategy 2: Vulnerable URL patterns (inurl:"pattern" combined with keywords)
+        vuln_patterns = selected_vuln_params or []
+        if vuln_patterns:
+            inurl_op = available_ops.get("inurl")
+            if inurl_op:
+                for pattern, kw in itertools.product(vuln_patterns, processed_keywords):
+                    # inurl:"pattern" keyword
+                    inurl_term = builder.build_operator_term("inurl", pattern)
+                    bare_kw = builder.quote_value(kw) if use_quotes else kw
+                    dork = self._assemble_dork(
+                        builder, [inurl_term, bare_kw],
+                        site_prefix, exclusion_suffix,
+                    )
+                    all_dorks.append(dork)
+
+                # Also: inurl:"pattern" + operator + keyword
+                for pattern, op_key, kw in itertools.product(
+                    vuln_patterns, non_ft_ops, processed_keywords
+                ):
+                    if op_key == "inurl":
+                        continue  # Skip duplicate inurl
+                    inurl_term = builder.build_operator_term("inurl", pattern)
+                    op_term = builder.build_operator_term(op_key, kw)
+                    parts = [inurl_term, op_term]
+                    if selected_filetypes and filetype_op_key:
+                        for ft in selected_filetypes:
+                            ft_parts = parts + [builder.build_operator_term(filetype_op_key, ft)]
+                            dork = self._assemble_dork(
+                                builder, ft_parts,
+                                site_prefix, exclusion_suffix,
+                            )
+                            all_dorks.append(dork)
+                    else:
+                        dork = self._assemble_dork(
+                            builder, parts,
+                            site_prefix, exclusion_suffix,
+                        )
+                        all_dorks.append(dork)
+
+        # Strategy 3: Multi-operator pairs (2 different operators + keyword)
         if len(non_ft_ops) >= 2:
             op_pairs = list(itertools.combinations(non_ft_ops, 2))
 

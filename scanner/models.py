@@ -150,6 +150,8 @@ class ScanConfig:
     )
     follow_redirects: bool = True
     verify_ssl: bool = False
+    proxies: list[str] = field(default_factory=list)
+    use_proxy: bool = False
 
     # Output
     output_dir: str = "scan_results"
@@ -177,4 +179,6 @@ class ScanConfig:
             "detect_xss": self.detect_xss,
             "follow_redirects": self.follow_redirects,
             "verify_ssl": self.verify_ssl,
+            "use_proxy": self.use_proxy,
+            "proxy_count": len(self.proxies),
         }

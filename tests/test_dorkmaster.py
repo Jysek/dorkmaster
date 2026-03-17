@@ -2,7 +2,7 @@
 DorkMaster - Comprehensive Test Suite
 ========================================
 
-Tests for the unified Dork Generator + Hunter tool.
+Tests for the unified Dork Generator + Hunter + Scanner tool.
 """
 
 import json
@@ -52,6 +52,28 @@ class TestDorkConfig(unittest.TestCase):
         self.assertIn("AND", bools)
         self.assertIn("OR", bools)
         self.assertIn("NOT", bools)
+
+    def test_vuln_params_loaded(self):
+        vp = self.config.vuln_params
+        self.assertIn("patterns", vp)
+        self.assertIn("generic", vp["patterns"])
+        self.assertIn("php", vp["patterns"])
+        self.assertIn("aspx", vp["patterns"])
+        # Check specific patterns exist
+        generic = vp["patterns"]["generic"]
+        self.assertIn(".php?id=1", generic)
+        self.assertIn(".aspx?pageid=", generic)
+
+    def test_vuln_params_php_patterns(self):
+        vp = self.config.vuln_params
+        php = vp["patterns"]["php"]
+        self.assertIn("index.php?id=", php)
+        self.assertGreater(len(php), 10)
+
+    def test_vuln_params_aspx_patterns(self):
+        vp = self.config.vuln_params
+        aspx = vp["patterns"]["aspx"]
+        self.assertIn("design1.aspx?pageid=", aspx)
 
 
 class TestDorkBuilder(unittest.TestCase):
@@ -163,6 +185,41 @@ class TestDorkGenerator(unittest.TestCase):
         for key in ["dorks", "total_generated", "total_possible", "engine", "engine_name", "warnings"]:
             self.assertIn(key, result)
 
+    def test_vuln_params_generation(self):
+        """Test that vuln_params generates inurl: dorks."""
+        result = self.gen.generate(
+            engine_id="google",
+            keywords=["admin"],
+            selected_operators=[],
+            selected_vuln_params=[".php?id=1", "index.php?id="],
+        )
+        self.assertGreater(len(result["dorks"]), 0)
+        has_inurl = any("inurl:" in d for d in result["dorks"])
+        self.assertTrue(has_inurl, "Should contain inurl: terms from vuln_params")
+
+    def test_vuln_params_with_operators(self):
+        """Test vuln_params combined with operators."""
+        result = self.gen.generate(
+            engine_id="google",
+            keywords=["login"],
+            selected_operators=["intitle"],
+            selected_vuln_params=[".php?id="],
+        )
+        self.assertGreater(len(result["dorks"]), 0)
+        # Should have: inurl + keyword, inurl + intitle + keyword, intitle + keyword
+        has_both = any("inurl:" in d and "intitle:" in d for d in result["dorks"])
+        self.assertTrue(has_both, "Should have dorks combining inurl and intitle")
+
+    def test_vuln_params_empty(self):
+        """Empty vuln_params should not break generation."""
+        result = self.gen.generate(
+            engine_id="google",
+            keywords=["test"],
+            selected_operators=["intitle"],
+            selected_vuln_params=[],
+        )
+        self.assertGreater(len(result["dorks"]), 0)
+
 
 class TestFlaskApp(unittest.TestCase):
     def setUp(self):
@@ -181,6 +238,13 @@ class TestFlaskApp(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertIn("engines", data)
+        self.assertIn("vuln_params", data)
+
+    def test_api_config_has_vuln_params(self):
+        resp = self.client.get("/api/config")
+        data = resp.get_json()
+        self.assertIn("vuln_params", data)
+        self.assertIn("patterns", data["vuln_params"])
 
     def test_api_generate(self):
         resp = self.client.post("/api/generate", json={
@@ -190,6 +254,18 @@ class TestFlaskApp(unittest.TestCase):
         })
         self.assertEqual(resp.status_code, 200)
         self.assertGreater(len(resp.get_json()["dorks"]), 0)
+
+    def test_api_generate_with_vuln_params(self):
+        resp = self.client.post("/api/generate", json={
+            "engine": "google",
+            "keywords": ["admin"],
+            "operators": [],
+            "vuln_params": [".php?id=1"],
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertGreater(len(data["dorks"]), 0)
+        self.assertTrue(any("inurl:" in d for d in data["dorks"]))
 
     def test_api_count(self):
         resp = self.client.post("/api/count", json={
@@ -222,6 +298,8 @@ class TestFlaskApp(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertIn("duckduckgo", data["available_free"])
+        self.assertIn("has_api_keys", data)
+        self.assertIn("proxy_enabled", data)
 
     def test_hunter_export(self):
         resp = self.client.post("/api/hunter/export", json={
@@ -252,8 +330,19 @@ class TestFlaskApp(unittest.TestCase):
         })
         self.assertEqual(resp.status_code, 400)
 
+    def test_scanner_batch_with_proxy(self):
+        """Test scanner batch API accepts use_proxy parameter."""
+        resp = self.client.post("/api/scanner/scan/batch", json={
+            "urls": ["http://example.com/page?id=1"],
+            "detect_sqli": True,
+            "detect_xss": True,
+            "max_concurrency": 2,
+            "timeout": 5,
+            "use_proxy": False,
+        })
+        self.assertEqual(resp.status_code, 200)
+
     def test_scanner_export_json(self):
-        """Test scanner export in JSON format."""
         resp = self.client.post("/api/scanner/export", json={
             "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
             "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
@@ -263,7 +352,6 @@ class TestFlaskApp(unittest.TestCase):
         self.assertIn("application/json", resp.content_type)
 
     def test_scanner_export_txt(self):
-        """Test scanner export in TXT format."""
         resp = self.client.post("/api/scanner/export", json={
             "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
             "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
@@ -273,7 +361,6 @@ class TestFlaskApp(unittest.TestCase):
         self.assertIn("text/plain", resp.content_type)
 
     def test_scanner_export_csv(self):
-        """Test scanner export in CSV format."""
         resp = self.client.post("/api/scanner/export", json={
             "results": [{"url": "http://a.com?x=1", "status": "clean", "findings": []}],
             "summary": {"total_urls": 1, "total_findings": 0, "vuln_counts": {}},
@@ -289,6 +376,15 @@ class TestHunterModules(unittest.TestCase):
         engine = FreeSearchEngine(queries=["test"], engines=["duckduckgo"])
         self.assertEqual(engine._engines, ["duckduckgo"])
         self.assertEqual(engine._queries, ["test"])
+
+    def test_free_engine_with_proxy(self):
+        from hunter.search.free_engine import FreeSearchEngine
+        engine = FreeSearchEngine(
+            queries=["test"],
+            engines=["duckduckgo"],
+            proxies=["http://proxy1:8080", "socks5://proxy2:1080"],
+        )
+        self.assertEqual(len(engine._proxies), 2)
 
     def test_url_validation(self):
         from hunter.search.free_engine import _is_valid_url
@@ -306,6 +402,16 @@ class TestHunterModules(unittest.TestCase):
         with self.assertRaises(KeyExhaustedError):
             km.rotate("test")
 
+    def test_key_manager_empty_keys_error(self):
+        from hunter.search.key_manager import KeyManager
+        with self.assertRaises(ValueError):
+            KeyManager([])
+
+    def test_key_manager_filters_empty_strings(self):
+        from hunter.search.key_manager import KeyManager
+        with self.assertRaises(ValueError):
+            KeyManager(["", "  ", ""])
+
     def test_load_dorks(self):
         from hunter.orchestrator import load_dorks_from_file
         dorks = load_dorks_from_file("dorks.txt")
@@ -316,6 +422,28 @@ class TestHunterModules(unittest.TestCase):
         stats = summary_stats(100, 10)
         self.assertEqual(stats["total_urls_extracted"], 100)
         self.assertEqual(stats["total_dorks_processed"], 10)
+
+    def test_api_engine_with_proxy(self):
+        """Test that SearchEngine accepts proxies parameter."""
+        from hunter.search.engine import SearchEngine
+        from hunter.config import SerperConfig
+
+        config = SerperConfig()
+        config.api_keys = ["test_key"]
+        engine = SearchEngine(config, proxies=["http://proxy:8080"])
+        self.assertEqual(len(engine._proxies), 1)
+
+    def test_api_engine_proxy_rotation(self):
+        """Test proxy rotation in SearchEngine."""
+        from hunter.search.engine import SearchEngine
+        from hunter.config import SerperConfig
+
+        config = SerperConfig()
+        config.api_keys = ["test_key"]
+        engine = SearchEngine(config, proxies=["http://p1:80", "http://p2:80"])
+        p1 = engine._get_proxy()
+        p2 = engine._get_proxy()
+        self.assertNotEqual(p1, p2)
 
 
 if __name__ == "__main__":

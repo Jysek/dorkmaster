@@ -110,6 +110,20 @@
                     </section>
 
                     <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Vuln Params <span class="badge" id="vpCount">0</span></h2>
+                        <p class="hint">URL patterns with injectable parameters (e.g., .php?id=1). Generates inurl: dorks targeting vulnerable endpoints.</p>
+                        <div class="chip-wrap chip-wrap--sm" id="vpGrid"></div>
+                        <div class="row gap-xs mt-xs">
+                            <button class="btn btn--ghost btn--xs" id="vpAll">All</button>
+                            <button class="btn btn--ghost btn--xs" id="vpNone">None</button>
+                        </div>
+                        <details class="accordion mt-xs">
+                            <summary class="accordion__head">Pattern Categories</summary>
+                            <div class="accordion__body" id="vpCatList"></div>
+                        </details>
+                    </section>
+
+                    <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
                         <div class="field"><label class="field__label">Site Restriction</label><input type="text" class="input-text" id="siteInput" placeholder="example.com" spellcheck="false"></div>
                         <div class="field"><label class="field__label">Exclusions (one per line)</label><textarea class="input-area input-area--sm" id="exclInput" rows="2" placeholder="facebook.com&#10;youtube.com" spellcheck="false"></textarea></div>
@@ -132,9 +146,9 @@
                     <div class="panel__header-right">
                         <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="genSearch" placeholder="Filter..." spellcheck="false"></div>
                         <button class="btn btn--ghost btn--xs" id="genSort" title="Sort">A-Z</button>
-                        <button class="btn btn--ghost btn--xs" id="genShuffle" title="Shuffle">&#x1F500;</button>
-                        <button class="btn btn--teal btn--xs" id="sendHunt" title="Send to Hunter" disabled>&#x27A1; Hunt</button>
-                        <button class="btn btn--teal btn--xs" id="sendScan" title="Send to Scanner" disabled>&#x1F6E1; Scan</button>
+                        <button class="btn btn--ghost btn--xs" id="genShuffle" title="Shuffle">Shuffle</button>
+                        <button class="btn btn--teal btn--xs" id="sendHunt" title="Send to Hunter" disabled>Hunt</button>
+                        <button class="btn btn--teal btn--xs" id="sendScan" title="Send to Scanner" disabled>Scan</button>
                     </div>
                 </div>
                 <div class="panel__body" id="genBody">
@@ -163,6 +177,16 @@
                     </section>
 
                     <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Search Mode</h2>
+                        <div class="chip-wrap mb-xs">
+                            <button class="chip chip--on" id="huntModeFree" data-mode="free">Free Engines</button>
+                            <button class="chip" id="huntModeApi" data-mode="api">API (Serper)</button>
+                        </div>
+                        <label class="toggle mb-xs"><input type="checkbox" id="huntUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
+                        <p class="hint" id="huntModeHint">Free mode: scrape search engines directly. No API key needed.</p>
+                    </section>
+
+                    <section class="card" id="huntFreeEnginesCard">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Free Engines <span class="badge badge--green">NO KEY</span></h2>
                         <div class="chip-wrap" id="huntEngines">
                             <button class="chip chip--on" data-engine="duckduckgo">DuckDuckGo</button>
@@ -189,7 +213,7 @@
                     <div class="panel__header-left"><h2 class="panel__title">Extracted URLs</h2><span class="panel__count" id="huntUrlCount">0 URLs</span></div>
                     <div class="panel__header-right">
                         <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="huntSearch" placeholder="Filter URLs..." spellcheck="false"></div>
-                        <button class="btn btn--teal btn--xs" id="sendUrlsToScan" title="Send URLs to Scanner" disabled>&#x1F6E1; Scan</button>
+                        <button class="btn btn--teal btn--xs" id="sendUrlsToScan" title="Send URLs to Scanner" disabled>Scan</button>
                     </div>
                 </div>
                 <div class="progress-bar" id="huntProgress" style="display:none;"><div class="progress-bar__fill" id="huntProgressFill"></div><div class="progress-bar__info"><span id="huntProgressText">Searching...</span><span id="huntProgressNum">0 URLs</span></div></div>
@@ -226,6 +250,8 @@
 
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
+                        <label class="toggle mb-xs"><input type="checkbox" id="scanUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
+                        <p class="hint mb-xs">Proxy rotates requests through your configured proxies. No API keys needed for scanning.</p>
                         <div class="field"><label class="field__label">Concurrency</label><input type="number" class="input-text input-text--sm" id="scanConc" value="20" min="1" max="50"></div>
                         <div class="field"><label class="field__label">Timeout (sec)</label><input type="number" class="input-text input-text--sm" id="scanTimeout" value="10" min="1" max="60"></div>
                         <div class="field"><label class="field__label">Rate Limit (req/s, 0=none)</label><input type="number" class="input-text input-text--sm" id="scanRate" value="50" min="0" max="200"></div>
@@ -244,7 +270,6 @@
                     </div>
                 </div>
                 <div class="progress-bar" id="scanProgress" style="display:none;"><div class="progress-bar__fill" id="scanProgressFill"></div><div class="progress-bar__info"><span id="scanProgressText">Scanning...</span><span id="scanProgressNum">0%</span></div></div>
-                <!-- Scan Summary -->
                 <div class="scan-summary" id="scanSummary" style="display:none;">
                     <div class="scan-summary__item scan-summary__item--total"><span class="scan-summary__label">URLs</span><span class="scan-summary__value" id="sumUrls">0</span></div>
                     <div class="scan-summary__item scan-summary__item--findings"><span class="scan-summary__label">Findings</span><span class="scan-summary__value" id="sumFindings">0</span></div>
@@ -280,14 +305,14 @@
 
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> API Keys</h2>
-                        <p class="hint">Serper.dev API keys (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.</p>
+                        <p class="hint">Serper.dev API keys (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>. Required for API mode in Hunter.</p>
                         <textarea class="input-area" id="setSerperKeys" rows="3" placeholder="Enter API keys..." spellcheck="false"></textarea>
                         <button class="btn btn--blue btn--sm mt-xs" id="saveKeysBtn">Save API Keys</button>
                     </section>
 
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Proxy Configuration</h2>
-                        <p class="hint">HTTP/SOCKS proxies. Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>
+                        <p class="hint">HTTP/SOCKS proxies for Hunter and Scanner. Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>
                         <label class="toggle mb-xs"><input type="checkbox" id="setProxyOn"><span class="toggle__track"></span><span class="toggle__text">Enable Proxy Mode</span></label>
                         <textarea class="input-area" id="setProxies" rows="4" placeholder="123.45.67.89:8080&#10;socks5://127.0.0.1:1080" spellcheck="false"></textarea>
                         <div class="row gap-xs mt-xs">

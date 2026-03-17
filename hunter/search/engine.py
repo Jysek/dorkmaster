@@ -6,6 +6,7 @@ Supports:
   - Multiple pages per dork for more results
   - Concurrent query execution
   - Real-time callback to stream discovered URLs
+  - Optional proxy support (proxy-only or API+proxy)
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from pathlib import Path
+from typing import Optional
 
 import httpx
 
@@ -49,13 +51,22 @@ def load_queries_from_file(path: str) -> list[str]:
 
 
 class SearchEngine:
-    """Sends dork queries to Serper.dev and collects unique result URLs."""
+    """Sends dork queries to Serper.dev and collects unique result URLs.
 
-    def __init__(self, config: SerperConfig) -> None:
+    Supports optional proxy rotation for all API requests.
+    """
+
+    def __init__(
+        self,
+        config: SerperConfig,
+        proxies: Optional[list[str]] = None,
+    ) -> None:
         self._cfg = config
         self._km = KeyManager(config.api_keys)
         self._seen_urls: set[str] = set()
         self._lock = asyncio.Lock()
+        self._proxies = proxies or []
+        self._proxy_index = 0
 
     def _get_queries(self) -> list[str]:
         if self._cfg.queries_file:
@@ -64,6 +75,27 @@ class SearchEngine:
                 return custom
             logger.warning("Dorks file was empty or missing.")
         return []
+
+    def _get_proxy(self) -> Optional[str]:
+        """Get next proxy in rotation, or None if no proxies."""
+        if not self._proxies:
+            return None
+        proxy = self._proxies[self._proxy_index % len(self._proxies)]
+        self._proxy_index += 1
+        if not proxy.startswith(("http://", "https://", "socks")):
+            proxy = "http://" + proxy
+        return proxy
+
+    def _make_client(self, proxy: Optional[str] = None) -> httpx.AsyncClient:
+        """Create an httpx AsyncClient with optional proxy."""
+        kwargs: dict = {
+            "timeout": 20,
+            "follow_redirects": True,
+            "verify": False,
+        }
+        if proxy:
+            kwargs["proxy"] = proxy
+        return httpx.AsyncClient(**kwargs)
 
     async def search_all(
         self,
@@ -82,8 +114,8 @@ class SearchEngine:
 
         total_requests = len(tasks_spec)
         logger.info(
-            "Search: %d dorks x %d pages = %d API requests",
-            len(queries), pages, total_requests,
+            "Search: %d dorks x %d pages = %d API requests (proxies: %d)",
+            len(queries), pages, total_requests, len(self._proxies),
         )
 
         search_conc = self._cfg.search_concurrency or max(5, len(self._cfg.api_keys) * 2)
@@ -92,48 +124,44 @@ class SearchEngine:
         completed = 0
         aborted = False
 
-        async with httpx.AsyncClient(timeout=20) as client:
-
-            async def _run_one(query: str, page: int) -> list[str]:
-                nonlocal completed, aborted
+        async def _run_one(query: str, page: int) -> list[str]:
+            nonlocal completed, aborted
+            if aborted:
+                return []
+            async with sem:
                 if aborted:
                     return []
-                async with sem:
-                    if aborted:
-                        return []
-                    try:
+                proxy = self._get_proxy()
+                try:
+                    async with self._make_client(proxy) as client:
                         urls = await self._search(client, query, page=page)
-                        completed += 1
+                    completed += 1
 
-                        if urls and on_results is not None:
-                            async with self._lock:
-                                on_results(urls)
+                    if urls and on_results is not None:
+                        async with self._lock:
+                            on_results(urls)
 
-                        if completed % 20 == 0 or completed == total_requests:
-                            logger.info(
-                                "Search progress: %d/%d requests done",
-                                completed, total_requests,
-                            )
-                        return urls
-
-                    except KeyExhaustedError:
-                        logger.error("All API keys exhausted -- aborting.")
-                        aborted = True
-                        return []
-                    except Exception as exc:
-                        logger.error(
-                            "Query failed (page %d): %s -- %s",
-                            page, query[:60], exc,
+                    if completed % 20 == 0 or completed == total_requests:
+                        logger.info(
+                            "Search progress: %d/%d requests done",
+                            completed, total_requests,
                         )
-                        completed += 1
-                        return []
+                    return urls
 
-            coros = [_run_one(q, p) for q, p in tasks_spec]
-            batch_results = await asyncio.gather(*coros)
+                except KeyExhaustedError:
+                    logger.error("All API keys exhausted -- aborting.")
+                    aborted = True
+                    return []
+                except Exception as exc:
+                    logger.error(
+                        "Query failed (page %d, proxy=%s): %s -- %s",
+                        page, proxy or "none", query[:60], exc,
+                    )
+                    completed += 1
+                    return []
 
-        all_urls: list[str] = []
-        for batch in batch_results:
-            all_urls.extend(batch)
+        coros = [_run_one(q, p) for q, p in tasks_spec]
+        await asyncio.gather(*coros)
 
         logger.info("Search complete: %d unique URLs discovered.", len(self._seen_urls))
         return list(self._seen_urls)

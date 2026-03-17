@@ -31,4 +31,5 @@ def index():
         "index.html",
         engines=engines,
         default_keywords=config.default_keywords,
+        vuln_params=config.vuln_params,
     )

@@ -3,9 +3,9 @@ DorkMaster Web - API Routes
 ===============================
 
 Handles JSON API endpoints for:
-  - Generator: dork generation, counting, export
-  - Hunter: search with real-time streaming (SSE), export
-  - Scanner: security scan for SQLi/XSS
+  - Generator: dork generation, counting, export, vuln_params
+  - Hunter: search with real-time streaming (SSE), API+free+proxy modes
+  - Scanner: security scan for SQLi/XSS with optional proxy
   - Settings: API keys, proxies, configuration
 """
 
@@ -38,8 +38,8 @@ from scanner.orchestrator import ScanOrchestrator
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
 # Lazy-initialized shared instances
-_config: DorkConfig = None
-_generator: DorkGenerator = None
+_config: DorkConfig | None = None
+_generator: DorkGenerator | None = None
 
 
 def _get_config() -> DorkConfig:
@@ -79,6 +79,7 @@ def get_config():
         "engines": engines,
         "default_keywords": config.default_keywords,
         "rules": config.generation_rules,
+        "vuln_params": config.vuln_params,
     })
 
 
@@ -119,6 +120,7 @@ def generate():
     custom_site = data.get("site", "")
     use_quotes = data.get("use_quotes", False)
     exclusions = data.get("exclusions", [])
+    vuln_params = data.get("vuln_params", [])
 
     try:
         max_results = int(data.get("max_results", 100))
@@ -131,6 +133,8 @@ def generate():
         keywords = [k.strip() for k in keywords.split("\n") if k.strip()]
     if isinstance(exclusions, str):
         exclusions = [e.strip() for e in exclusions.split("\n") if e.strip()]
+    if isinstance(vuln_params, str):
+        vuln_params = [v.strip() for v in vuln_params.split("\n") if v.strip()]
 
     generator = _get_generator()
     result = generator.generate(
@@ -143,6 +147,7 @@ def generate():
         include_exclusions=exclusions,
         max_results=max_results,
         shuffle=True,
+        selected_vuln_params=vuln_params,
     )
     return jsonify(result)
 
@@ -212,83 +217,22 @@ def export():
 @api_bp.route("/hunter/engines")
 def hunter_engines():
     """Return available search engines for the hunter, classified by type."""
+    cfg = get_hunter_config()
     return jsonify({
         "free_engines": FREE_ENGINE_INFO,
         "api_engines": API_ENGINES,
         "available_free": FREE_ENGINES,
+        "has_api_keys": len(cfg.serper.api_keys) > 0,
+        "proxy_enabled": cfg.proxy.enabled,
+        "proxy_count": len(cfg.proxy.proxies),
     })
 
 
 @api_bp.route("/hunter/search", methods=["POST"])
 def hunter_search():
-    """Execute dork hunting and return results (non-streaming)."""
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "No JSON data provided."}), 400
+    """Execute dork hunting and return results (non-streaming).
 
-    dorks = data.get("dorks", [])
-    if isinstance(dorks, str):
-        dorks = [d.strip() for d in dorks.split("\n") if d.strip()]
-
-    if not dorks:
-        return jsonify({"error": "No dorks provided."}), 400
-
-    engines = data.get("engines", ["duckduckgo", "bing"])
-    pages = data.get("pages_per_dork", 1)
-    max_conc = data.get("max_concurrency", 3)
-    use_proxy = data.get("use_proxy", False)
-
-    # Validate engines
-    valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
-    if not valid_engines:
-        valid_engines = ["duckduckgo", "bing"]
-
-    try:
-        pages = max(1, min(5, int(pages)))
-        max_conc = max(1, min(10, int(max_conc)))
-    except (ValueError, TypeError):
-        pages = 1
-        max_conc = 3
-
-    # Get proxies if enabled
-    proxies = []
-    if use_proxy:
-        cfg = get_hunter_config()
-        proxies = cfg.proxy.proxies if cfg.proxy.enabled else []
-
-    # Run search
-    search_engine = FreeSearchEngine(
-        queries=dorks,
-        engines=valid_engines,
-        pages_per_dork=pages,
-        proxies=proxies,
-    )
-
-    loop = asyncio.new_event_loop()
-    try:
-        urls = loop.run_until_complete(
-            search_engine.search_all(max_concurrency=max_conc)
-        )
-    finally:
-        loop.close()
-
-    return jsonify({
-        "urls": urls,
-        "total_urls": len(urls),
-        "dorks_processed": len(dorks),
-        "engines_used": valid_engines,
-    })
-
-
-@api_bp.route("/hunter/search/stream", methods=["POST"])
-def hunter_search_stream():
-    """Execute dork hunting with Server-Sent Events (SSE) for real-time results.
-
-    Returns an SSE stream with events:
-      - url: {url}           -- each new unique URL found
-      - progress: {json}     -- progress update with counts
-      - done: {json}         -- final summary
-      - error: {message}     -- error message
+    Supports modes: free, api, free+proxy, api+proxy.
     """
     data = request.get_json(silent=True)
     if not data:
@@ -301,14 +245,18 @@ def hunter_search_stream():
     if not dorks:
         return jsonify({"error": "No dorks provided."}), 400
 
+    search_mode = data.get("search_mode", "free")  # "free" or "api"
     engines = data.get("engines", ["duckduckgo", "bing"])
     pages = data.get("pages_per_dork", 1)
     max_conc = data.get("max_concurrency", 3)
     use_proxy = data.get("use_proxy", False)
 
-    valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
-    if not valid_engines:
-        valid_engines = ["duckduckgo", "bing"]
+    # Get proxies if requested
+    proxies: list[str] = []
+    if use_proxy:
+        cfg = get_hunter_config()
+        if cfg.proxy.enabled and cfg.proxy.proxies:
+            proxies = list(cfg.proxy.proxies)
 
     try:
         pages = max(1, min(5, int(pages)))
@@ -317,47 +265,137 @@ def hunter_search_stream():
         pages = 1
         max_conc = 3
 
-    # Get proxies if enabled
-    proxies = []
+    loop = asyncio.new_event_loop()
+    try:
+        if search_mode == "api":
+            # API mode
+            cfg = get_hunter_config()
+            if not cfg.serper.api_keys:
+                return jsonify({"error": "No API keys configured. Add them in Settings."}), 400
+
+            from hunter.config import SerperConfig
+            serper_cfg = SerperConfig()
+            serper_cfg.api_keys = cfg.serper.api_keys
+            serper_cfg.pages_per_query = pages
+            serper_cfg.search_concurrency = max_conc
+
+            api_engine = SearchEngine(serper_cfg, proxies=proxies)
+            api_engine._get_queries = lambda: dorks  # type: ignore[assignment]
+            urls = loop.run_until_complete(api_engine.search_all())
+        else:
+            # Free mode
+            valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
+            if not valid_engines:
+                valid_engines = ["duckduckgo", "bing"]
+
+            search_engine = FreeSearchEngine(
+                queries=dorks,
+                engines=valid_engines,
+                pages_per_dork=pages,
+                proxies=proxies,
+            )
+            urls = loop.run_until_complete(
+                search_engine.search_all(max_concurrency=max_conc)
+            )
+    finally:
+        loop.close()
+
+    return jsonify({
+        "urls": urls,
+        "total_urls": len(urls),
+        "dorks_processed": len(dorks),
+        "search_mode": search_mode,
+        "proxy_used": len(proxies) > 0,
+    })
+
+
+@api_bp.route("/hunter/search/stream", methods=["POST"])
+def hunter_search_stream():
+    """Execute dork hunting with Server-Sent Events (SSE) for real-time results.
+
+    Supports modes: free, api, free+proxy, api+proxy.
+    """
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No JSON data provided."}), 400
+
+    dorks = data.get("dorks", [])
+    if isinstance(dorks, str):
+        dorks = [d.strip() for d in dorks.split("\n") if d.strip()]
+
+    if not dorks:
+        return jsonify({"error": "No dorks provided."}), 400
+
+    search_mode = data.get("search_mode", "free")
+    engines = data.get("engines", ["duckduckgo", "bing"])
+    pages = data.get("pages_per_dork", 1)
+    max_conc = data.get("max_concurrency", 3)
+    use_proxy = data.get("use_proxy", False)
+
+    try:
+        pages = max(1, min(5, int(pages)))
+        max_conc = max(1, min(10, int(max_conc)))
+    except (ValueError, TypeError):
+        pages = 1
+        max_conc = 3
+
+    # Get proxies if requested
+    proxies: list[str] = []
     if use_proxy:
         cfg = get_hunter_config()
-        proxies = cfg.proxy.proxies if cfg.proxy.enabled else []
+        if cfg.proxy.enabled and cfg.proxy.proxies:
+            proxies = list(cfg.proxy.proxies)
 
     def generate_events():
         """Generator that yields SSE events."""
-        all_urls = []
-        completed = [0]
-        total = len(dorks) * len(valid_engines) * pages
+        import queue
+        import threading
 
-        def on_urls(new_urls):
-            all_urls.extend(new_urls)
+        result_queue: queue.Queue = queue.Queue()
 
-        search_engine = FreeSearchEngine(
-            queries=dorks,
-            engines=valid_engines,
-            pages_per_dork=pages,
-            proxies=proxies,
-        )
+        def on_results_callback(new_urls: list[str]) -> None:
+            for url in new_urls:
+                result_queue.put(("url", url))
+            result_queue.put(("progress", {"total_urls": len(new_urls)}))
 
-        loop = asyncio.new_event_loop()
+        def run_search():
+            loop = asyncio.new_event_loop()
+            try:
+                if search_mode == "api":
+                    cfg = get_hunter_config()
+                    if not cfg.serper.api_keys:
+                        result_queue.put(("error", "No API keys configured."))
+                        result_queue.put(None)
+                        return
 
-        try:
-            # We need to run the async search and yield results.
-            # Use a queue to communicate between async and sync code.
-            import queue
-            import threading
+                    from hunter.config import SerperConfig
+                    serper_cfg = SerperConfig()
+                    serper_cfg.api_keys = cfg.serper.api_keys
+                    serper_cfg.pages_per_query = pages
+                    serper_cfg.search_concurrency = max_conc
 
-            result_queue = queue.Queue()
+                    api_engine = SearchEngine(serper_cfg, proxies=proxies)
+                    api_engine._get_queries = lambda: dorks  # type: ignore[assignment]
 
-            def on_results_callback(new_urls):
-                for url in new_urls:
-                    result_queue.put(("url", url))
-                result_queue.put(("progress", {
-                    "total_urls": search_engine.discovered_count,
-                }))
+                    urls = loop.run_until_complete(
+                        api_engine.search_all(on_results=on_results_callback)
+                    )
+                    result_queue.put(("done", {
+                        "total_urls": api_engine.discovered_count,
+                        "dorks_processed": len(dorks),
+                        "search_mode": "api",
+                    }))
+                else:
+                    valid_engines = [e for e in engines if e in AVAILABLE_ENGINES]
+                    if not valid_engines:
+                        valid_engines = ["duckduckgo", "bing"]
 
-            def run_search():
-                try:
+                    search_engine = FreeSearchEngine(
+                        queries=dorks,
+                        engines=valid_engines,
+                        pages_per_dork=pages,
+                        proxies=proxies,
+                    )
                     loop.run_until_complete(
                         search_engine.search_all(
                             on_results=on_results_callback,
@@ -367,41 +405,38 @@ def hunter_search_stream():
                     result_queue.put(("done", {
                         "total_urls": search_engine.discovered_count,
                         "dorks_processed": len(dorks),
-                        "engines_used": valid_engines,
+                        "engines_used": valid_engines if search_mode == "free" else ["serper"],
                     }))
-                except Exception as exc:
-                    result_queue.put(("error", str(exc)))
-                finally:
-                    result_queue.put(None)  # Sentinel
-                    loop.close()
+            except Exception as exc:
+                result_queue.put(("error", str(exc)))
+            finally:
+                result_queue.put(None)  # Sentinel
+                loop.close()
 
-            thread = threading.Thread(target=run_search, daemon=True)
-            thread.start()
+        thread = threading.Thread(target=run_search, daemon=True)
+        thread.start()
 
-            while True:
-                try:
-                    item = result_queue.get(timeout=120)
-                except queue.Empty:
-                    yield "event: error\ndata: Timeout waiting for results\n\n"
-                    break
+        while True:
+            try:
+                item = result_queue.get(timeout=120)
+            except queue.Empty:
+                yield "event: error\ndata: Timeout waiting for results\n\n"
+                break
 
-                if item is None:
-                    break
+            if item is None:
+                break
 
-                event_type, event_data = item
-                if event_type == "url":
-                    yield f"event: url\ndata: {json.dumps({'url': event_data})}\n\n"
-                elif event_type == "progress":
-                    yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
-                elif event_type == "done":
-                    yield f"event: done\ndata: {json.dumps(event_data)}\n\n"
-                elif event_type == "error":
-                    yield f"event: error\ndata: {json.dumps({'error': event_data})}\n\n"
+            event_type, event_data = item
+            if event_type == "url":
+                yield f"event: url\ndata: {json.dumps({'url': event_data})}\n\n"
+            elif event_type == "progress":
+                yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
+            elif event_type == "done":
+                yield f"event: done\ndata: {json.dumps(event_data)}\n\n"
+            elif event_type == "error":
+                yield f"event: error\ndata: {json.dumps({'error': event_data})}\n\n"
 
-            thread.join(timeout=5)
-
-        except Exception as exc:
-            yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
+        thread.join(timeout=5)
 
     return Response(
         stream_with_context(generate_events()),
@@ -476,9 +511,9 @@ def hunter_export():
 
 @api_bp.route("/scanner/scan", methods=["POST"])
 def scanner_scan():
-    """Run a security scan on provided URLs.
+    """Run a security scan on provided URLs (SSE stream).
 
-    Returns an SSE stream with scan progress and results.
+    Supports optional proxy mode.
     """
     data = request.get_json(silent=True)
     if not data:
@@ -496,6 +531,7 @@ def scanner_scan():
     max_concurrency = data.get("max_concurrency", 20)
     timeout_seconds = data.get("timeout", 10)
     rate_limit_rps = data.get("rate_limit", 50)
+    use_proxy = data.get("use_proxy", False)
 
     try:
         max_concurrency = max(1, min(50, int(max_concurrency)))
@@ -506,6 +542,13 @@ def scanner_scan():
         timeout_seconds = 10
         rate_limit_rps = 50
 
+    # Get proxies if requested
+    proxies: list[str] = []
+    if use_proxy:
+        cfg = get_hunter_config()
+        if cfg.proxy.enabled and cfg.proxy.proxies:
+            proxies = list(cfg.proxy.proxies)
+
     config = ScanConfig(
         max_concurrency=max_concurrency,
         timeout_seconds=float(timeout_seconds),
@@ -513,6 +556,8 @@ def scanner_scan():
         detect_sqli=detect_sqli,
         detect_xss=detect_xss,
         output_dir="scan_results",
+        use_proxy=bool(proxies),
+        proxies=proxies,
     )
 
     def generate_events():
@@ -520,9 +565,9 @@ def scanner_scan():
         import queue
         import threading
 
-        result_queue = queue.Queue()
+        result_queue: queue.Queue = queue.Queue()
 
-        def on_progress(current, total, url):
+        def on_progress(current: int, total: int, url: str) -> None:
             result_queue.put(("progress", {
                 "current": current,
                 "total": total,
@@ -551,7 +596,7 @@ def scanner_scan():
             try:
                 item = result_queue.get(timeout=300)
             except queue.Empty:
-                yield "event: error\ndata: {\"error\": \"Scan timed out\"}\n\n"
+                yield 'event: error\ndata: {"error": "Scan timed out"}\n\n'
                 break
 
             if item is None:
@@ -597,6 +642,7 @@ def scanner_scan_batch():
     max_concurrency = data.get("max_concurrency", 20)
     timeout_seconds = data.get("timeout", 10)
     rate_limit_rps = data.get("rate_limit", 50)
+    use_proxy = data.get("use_proxy", False)
 
     try:
         max_concurrency = max(1, min(50, int(max_concurrency)))
@@ -607,6 +653,12 @@ def scanner_scan_batch():
         timeout_seconds = 10
         rate_limit_rps = 50
 
+    proxies: list[str] = []
+    if use_proxy:
+        cfg = get_hunter_config()
+        if cfg.proxy.enabled and cfg.proxy.proxies:
+            proxies = list(cfg.proxy.proxies)
+
     config = ScanConfig(
         max_concurrency=max_concurrency,
         timeout_seconds=float(timeout_seconds),
@@ -614,6 +666,8 @@ def scanner_scan_batch():
         detect_sqli=detect_sqli,
         detect_xss=detect_xss,
         output_dir="scan_results",
+        use_proxy=bool(proxies),
+        proxies=proxies,
     )
 
     loop = asyncio.new_event_loop()
@@ -720,6 +774,8 @@ def scanner_export():
             },
         )
 
+    return jsonify({"error": f"Unknown format: {fmt}"}), 400
+
 
 # ================================================================
 # Settings API
@@ -798,8 +854,8 @@ def test_proxies():
     timeout = data.get("timeout", 10)
     test_url = "https://httpbin.org/ip"
 
-    working = []
-    failed = []
+    working: list[str] = []
+    failed: list[str] = []
 
     loop = asyncio.new_event_loop()
     try:
@@ -809,7 +865,7 @@ def test_proxies():
             async def test_one(proxy_str: str):
                 async with sem:
                     p = proxy_str.strip()
-                    if not p.startswith("http://") and not p.startswith("https://") and not p.startswith("socks"):
+                    if not p.startswith(("http://", "https://", "socks")):
                         p = "http://" + p
 
                     try:

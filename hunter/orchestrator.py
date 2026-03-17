@@ -2,7 +2,11 @@
 Orchestrator -- wires search and reporting together.
 
 Simple pipeline: load dorks -> search -> save extracted URLs.
-Supports both API (Serper.dev) and free (multi-engine) search modes.
+Supports:
+  - Free mode (scraping search engines directly)
+  - API mode (Serper.dev)
+  - Proxy-only (free engines via proxies)
+  - API + proxy (Serper.dev via proxies)
 """
 
 from __future__ import annotations
@@ -55,13 +59,28 @@ def _export_all(urls: list[str], data_dir: Path, dork_count: int = 0) -> None:
     )
 
 
+def _get_proxies(cfg: HunterConfig) -> list[str]:
+    """Get proxy list from config if enabled."""
+    if cfg.proxy.enabled and cfg.proxy.proxies:
+        return list(cfg.proxy.proxies)
+    return []
+
+
 async def run_pipeline(
     config: HunterConfig | None = None,
     custom_dorks: list[str] | None = None,
 ) -> list[str]:
-    """Execute the full search pipeline: load dorks -> search -> export."""
+    """Execute the full search pipeline: load dorks -> search -> export.
+
+    Modes:
+      - free:       Scrape free search engines directly
+      - free+proxy: Scrape free search engines via proxies
+      - api:        Use Serper.dev API
+      - api+proxy:  Use Serper.dev API via proxies
+    """
     cfg = config or get_hunter_config()
     rt_exporter = RealtimeExporter(cfg.data_dir)
+    proxies = _get_proxies(cfg)
 
     def _on_urls_found(new_urls: list[str]) -> None:
         rt_exporter.add_urls(new_urls)
@@ -78,20 +97,29 @@ async def run_pipeline(
         return []
 
     dork_count = len(dorks)
-    logger.info("=== Search Phase: %d dorks (mode=%s) ===", dork_count, cfg.search_mode)
+    mode_desc = cfg.search_mode
+    if proxies:
+        mode_desc += f"+proxy({len(proxies)})"
+
+    logger.info("=== Search Phase: %d dorks (mode=%s) ===", dork_count, mode_desc)
 
     if cfg.search_mode == "free":
         engine = FreeSearchEngine(
             queries=dorks,
             engines=cfg.search.free_engines,
             pages_per_dork=cfg.search.pages_per_dork,
+            proxies=proxies,
         )
         urls = await engine.search_all(
             on_results=_on_urls_found,
             max_concurrency=cfg.search.max_threads,
         )
     else:
-        api_engine = SearchEngine(cfg.serper)
+        # API mode -- requires valid API keys
+        if not cfg.serper.api_keys:
+            logger.error("API mode selected but no API keys configured.")
+            return []
+        api_engine = SearchEngine(cfg.serper, proxies=proxies)
         if custom_dorks:
             api_engine._get_queries = lambda: custom_dorks  # type: ignore[assignment]
         urls = await api_engine.search_all(on_results=_on_urls_found)
