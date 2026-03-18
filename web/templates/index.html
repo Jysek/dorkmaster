@@ -74,6 +74,53 @@
                         </div>
                     </section>
 
+                    <!-- CUSTOM PARAM BUILDER -->
+                    <section class="card">
+                        <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg> Custom Param Builder</h2>
+                        <p class="hint">Build custom vulnerable URL patterns. Select file type and parameter name to generate engine-specific dorks.</p>
+                        <div class="row gap-xs mb-xs">
+                            <div class="field" style="flex:1">
+                                <label class="field__label">File Type</label>
+                                <select class="input-text input-text--sm" id="paramFileType">
+                                    <option value=".php">.php</option>
+                                    <option value=".asp">.asp</option>
+                                    <option value=".aspx">.aspx</option>
+                                    <option value=".jsp">.jsp</option>
+                                    <option value=".cfm">.cfm</option>
+                                    <option value=".cgi">.cgi</option>
+                                    <option value=".pl">.pl</option>
+                                </select>
+                            </div>
+                            <div class="field" style="flex:1">
+                                <label class="field__label">Custom Type</label>
+                                <input type="text" class="input-text input-text--sm" id="paramCustomType" placeholder=".py" spellcheck="false">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label class="field__label">Parameter Name</label>
+                            <input type="text" class="input-text input-text--sm" id="paramName" placeholder="id" spellcheck="false">
+                        </div>
+                        <div class="param-presets mb-xs">
+                            <span class="hint" style="margin-bottom:2px;display:block">Common params:</span>
+                            <div class="row gap-xs" style="flex-wrap:wrap">
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="id">id=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="page">page=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="file">file=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="cat">cat=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="q">q=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="search">search=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="action">action=</button>
+                                <button class="btn btn--ghost btn--xs param-preset" data-param="uid">uid=</button>
+                            </div>
+                        </div>
+                        <div class="param-preview" id="paramPreview" style="display:none;">
+                            <div class="field__label">Preview</div>
+                            <div class="param-preview__url" id="paramPreviewUrl"></div>
+                            <div class="param-preview__dorks" id="paramPreviewDorks"></div>
+                        </div>
+                        <button class="btn btn--teal btn--xs mt-xs" id="paramAddBtn">Add to Vuln Params</button>
+                    </section>
+
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Keywords <span class="badge" id="kwCount">0</span></h2>
                         <textarea class="input-area" id="kwInput" rows="4" placeholder="login&#10;admin panel&#10;dashboard" spellcheck="false"></textarea>
@@ -179,8 +226,6 @@
                     <!-- SEARCH MODE SELECTION -->
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Search Mode</h2>
-
-                        <!-- FREE MODE -->
                         <div class="mode-card mode-card--active" id="huntModeCardFree" data-mode="free">
                             <div class="mode-card__header">
                                 <span class="mode-card__badge mode-card__badge--free">FREE</span>
@@ -188,8 +233,6 @@
                             </div>
                             <p class="mode-card__desc">Scrape search engines directly. No API key, no limits.</p>
                         </div>
-
-                        <!-- PREMIUM MODE -->
                         <div class="mode-card" id="huntModeCardApi" data-mode="api">
                             <div class="mode-card__header">
                                 <span class="mode-card__badge mode-card__badge--premium">PREMIUM</span>
@@ -204,11 +247,10 @@
                                 </div>
                             </div>
                         </div>
-
                         <label class="toggle mt-xs"><input type="checkbox" id="huntUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
                     </section>
 
-                    <!-- FREE ENGINES (shown in free mode) -->
+                    <!-- FREE ENGINES -->
                     <section class="card" id="huntFreeEnginesCard">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Free Engines <span class="badge badge--green">NO KEY</span></h2>
                         <p class="hint">All engines below are 100% free, no API key, no limits.</p>
@@ -224,7 +266,9 @@
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
                         <div class="field"><label class="field__label">Pages per Dork</label><input type="number" class="input-text input-text--sm" id="huntPages" value="1" min="1" max="5"></div>
-                        <div class="field"><label class="field__label">Concurrency</label><input type="number" class="input-text input-text--sm" id="huntConc" value="3" min="1" max="10"></div>
+                        <div class="field"><label class="field__label">Concurrency (threads)</label><input type="number" class="input-text input-text--sm" id="huntConc" value="3" min="1" max="10"></div>
+                        <div class="field"><label class="field__label">Min Delay (sec)</label><input type="number" class="input-text input-text--sm" id="huntDelayMin" value="1.0" min="0.1" max="10" step="0.1"></div>
+                        <div class="field"><label class="field__label">Max Delay (sec)</label><input type="number" class="input-text input-text--sm" id="huntDelayMax" value="3.0" min="0.5" max="30" step="0.1"></div>
                     </section>
                 </div>
                 <div class="sidebar__footer">
@@ -237,13 +281,25 @@
                     <div class="panel__header-left"><h2 class="panel__title">Extracted URLs</h2><span class="panel__count" id="huntUrlCount">0 URLs</span></div>
                     <div class="panel__header-right">
                         <div class="search-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" class="search-box__input" id="huntSearch" placeholder="Filter URLs..." spellcheck="false"></div>
+                        <button class="btn btn--ghost btn--xs" id="toggleLog" title="Toggle Log">Log</button>
                         <button class="btn btn--teal btn--xs" id="sendUrlsToScan" title="Send URLs to Scanner" disabled>Scan</button>
                     </div>
                 </div>
+                <!-- IMPROVED PROGRESS BAR -->
                 <div class="progress-bar" id="huntProgress" style="display:none;"><div class="progress-bar__fill" id="huntProgressFill"></div><div class="progress-bar__info"><span id="huntProgressText">Searching...</span><span id="huntProgressNum">0 URLs</span></div></div>
+                <!-- ENGINE STATUS -->
+                <div class="engine-status-bar" id="engineStatusBar" style="display:none;"></div>
                 <div class="panel__body" id="huntBody">
                     <div class="empty-state" id="huntEmpty"><div class="empty-state__icon"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity=".25"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h3>No URLs Yet</h3><p>Enter dork queries and click <strong>Start Hunting</strong></p></div>
                     <div class="row-list" id="huntList" style="display:none;"></div>
+                    <!-- DEBUG LOG PANEL -->
+                    <div class="debug-log" id="debugLog" style="display:none;">
+                        <div class="debug-log__header">
+                            <span>Debug Log</span>
+                            <button class="btn btn--ghost btn--xs" id="clearLog">Clear</button>
+                        </div>
+                        <div class="debug-log__body" id="debugLogBody"></div>
+                    </div>
                 </div>
                 <div class="panel__footer">
                     <div class="row gap-xs"><button class="btn btn--blue btn--xs" id="huntCopyAll" disabled>Copy All URLs</button></div>
@@ -258,7 +314,7 @@
                 <div class="sidebar__scroll">
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg> Target URLs <span class="badge" id="scanUrlCount">0</span></h2>
-                        <p class="hint">Enter URLs with GET parameters to scan (one per line). URLs without parameters will be skipped.</p>
+                        <p class="hint">Enter URLs with GET parameters to scan (one per line).</p>
                         <textarea class="input-area" id="scanUrls" rows="8" placeholder="http://example.com/page?id=1&name=test&#10;http://vuln-site.com/search?q=hello" spellcheck="false"></textarea>
                         <div class="row gap-xs mt-xs">
                             <label class="btn btn--ghost btn--xs"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Upload<input type="file" id="scanFileUpload" accept=".txt" hidden></label>
@@ -275,7 +331,6 @@
                     <section class="card">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Options</h2>
                         <label class="toggle mb-xs"><input type="checkbox" id="scanUseProxy"><span class="toggle__track"></span><span class="toggle__text">Use Proxy</span></label>
-                        <p class="hint mb-xs">Proxy rotates requests through your configured proxies. No API keys needed for scanning.</p>
                         <div class="field"><label class="field__label">Concurrency</label><input type="number" class="input-text input-text--sm" id="scanConc" value="20" min="1" max="50"></div>
                         <div class="field"><label class="field__label">Timeout (sec)</label><input type="number" class="input-text input-text--sm" id="scanTimeout" value="10" min="1" max="60"></div>
                         <div class="field"><label class="field__label">Rate Limit (req/s, 0=none)</label><input type="number" class="input-text input-text--sm" id="scanRate" value="50" min="0" max="200"></div>
@@ -318,7 +373,6 @@
                     <h2 class="settings-page__title">Settings</h2>
                     <p class="hint mb-md">Configure API keys, proxies, and monitor your quota.</p>
 
-                    <!-- STATUS -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Status</h2>
                         <div class="status-grid" id="statusGrid">
@@ -328,43 +382,29 @@
                         </div>
                     </section>
 
-                    <!-- QUOTA TRACKER -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> API Query Quota <span class="badge badge--green" id="quotaBadge">0 left</span></h2>
-                        <p class="hint">Each Serper.dev key = 2,500 free queries. Monitor your usage below.</p>
+                        <p class="hint">Each Serper.dev key = 2,500 free queries.</p>
                         <div class="quota-overview" id="quotaOverview">
-                            <div class="quota-overview__stat">
-                                <span class="quota-overview__label">Total Capacity</span>
-                                <span class="quota-overview__value" id="quotaCapacity">0</span>
-                            </div>
-                            <div class="quota-overview__stat">
-                                <span class="quota-overview__label">Used</span>
-                                <span class="quota-overview__value quota-overview__value--used" id="quotaUsed">0</span>
-                            </div>
-                            <div class="quota-overview__stat">
-                                <span class="quota-overview__label">Remaining</span>
-                                <span class="quota-overview__value quota-overview__value--remaining" id="quotaRemaining">0</span>
-                            </div>
+                            <div class="quota-overview__stat"><span class="quota-overview__label">Total Capacity</span><span class="quota-overview__value" id="quotaCapacity">0</span></div>
+                            <div class="quota-overview__stat"><span class="quota-overview__label">Used</span><span class="quota-overview__value quota-overview__value--used" id="quotaUsed">0</span></div>
+                            <div class="quota-overview__stat"><span class="quota-overview__label">Remaining</span><span class="quota-overview__value quota-overview__value--remaining" id="quotaRemaining">0</span></div>
                         </div>
-                        <div class="quota-bar mt-xs">
-                            <div class="quota-bar__track"><div class="quota-bar__fill" id="quotaFillSettings"></div></div>
-                        </div>
+                        <div class="quota-bar mt-xs"><div class="quota-bar__track"><div class="quota-bar__fill" id="quotaFillSettings"></div></div></div>
                         <div id="quotaKeyList" class="mt-xs"></div>
                         <button class="btn btn--warn btn--xs mt-xs" id="resetQuotaBtn">Reset All Counters</button>
                     </section>
 
-                    <!-- API KEYS -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> API Keys <span class="badge badge--premium">PREMIUM</span></h2>
-                        <p class="hint">Serper.dev API keys for PREMIUM search mode (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.</p>
+                        <p class="hint">Serper.dev API keys (one per line). Get free at <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--blue);">serper.dev</a>.</p>
                         <textarea class="input-area" id="setSerperKeys" rows="3" placeholder="Enter API keys (one per line)..." spellcheck="false"></textarea>
                         <button class="btn btn--blue btn--sm mt-xs" id="saveKeysBtn">Save API Keys</button>
                     </section>
 
-                    <!-- PROXY -->
                     <section class="card mb-md">
                         <h2 class="card__title"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Proxy Configuration</h2>
-                        <p class="hint">HTTP/SOCKS proxies for Hunter and Scanner. Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>
+                        <p class="hint">Format: <code>ip:port</code> or <code>socks5://ip:port</code></p>
                         <label class="toggle mb-xs"><input type="checkbox" id="setProxyOn"><span class="toggle__track"></span><span class="toggle__text">Enable Proxy Mode</span></label>
                         <textarea class="input-area" id="setProxies" rows="4" placeholder="123.45.67.89:8080&#10;socks5://127.0.0.1:1080" spellcheck="false"></textarea>
                         <div class="row gap-xs mt-xs">
