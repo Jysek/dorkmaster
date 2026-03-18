@@ -8,7 +8,11 @@ Supported engines:
   - Google (HTML -- with scraping)
   - Ask.com (HTML)
 
-Supports optional proxy rotation for all engines.
+Supports:
+  - Optional proxy rotation for all engines
+  - Engine status tracking (OK / Timeout / Blocked / Error)
+  - Configurable delay between requests
+  - Per-query progress callback with engine info
 """
 
 from __future__ import annotations
@@ -16,8 +20,11 @@ from __future__ import annotations
 import asyncio
 import random
 import re
+import time
 import urllib.parse
 from collections.abc import Callable
+from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -26,6 +33,43 @@ import httpx
 from hunter.utils.logging import get_logger
 
 logger = get_logger("free_search")
+
+# ---------------------------------------------------------------------------
+# Engine Status
+# ---------------------------------------------------------------------------
+
+class EngineStatus(str, Enum):
+    OK = "ok"
+    TIMEOUT = "timeout"
+    BLOCKED = "blocked"
+    ERROR = "error"
+    PENDING = "pending"
+
+
+@dataclass
+class EngineState:
+    """Tracks per-engine status and stats."""
+    engine: str
+    name: str
+    status: EngineStatus = EngineStatus.PENDING
+    queries_done: int = 0
+    queries_total: int = 0
+    urls_found: int = 0
+    errors: int = 0
+    last_error: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "engine": self.engine,
+            "name": self.name,
+            "status": self.status.value,
+            "queries_done": self.queries_done,
+            "queries_total": self.queries_total,
+            "urls_found": self.urls_found,
+            "errors": self.errors,
+            "last_error": self.last_error,
+        }
+
 
 # ---------------------------------------------------------------------------
 # User-Agent pool
@@ -48,6 +92,14 @@ _USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
 ]
 
+ENGINE_DISPLAY_NAMES = {
+    "duckduckgo": "DuckDuckGo",
+    "bing": "Bing",
+    "yahoo": "Yahoo",
+    "google": "Google",
+    "ask": "Ask.com",
+}
+
 # ---------------------------------------------------------------------------
 # Engine URLs
 # ---------------------------------------------------------------------------
@@ -61,15 +113,14 @@ _ASK_URL = "https://www.ask.com/web"
 # Extraction regexes
 # ---------------------------------------------------------------------------
 
-# DuckDuckGo: extract from result links
+# DuckDuckGo
 _DDG_LINK_RE = re.compile(r'class="result__a"[^>]*href="([^"]+)"', re.I)
 _DDG_UDDG_RE = re.compile(r"uddg=([^&]+)", re.I)
-# Fallback: extract from result snippets
 _DDG_RESULT_URL_RE = re.compile(
     r'<a[^>]+class="result__url"[^>]*href="([^"]+)"', re.I
 )
 
-# Bing: multiple patterns for robustness
+# Bing
 _BING_LINK_RE = re.compile(
     r'<li class="b_algo".*?<a\s+href="(https?://[^"]+)"', re.I | re.S,
 )
@@ -80,7 +131,7 @@ _BING_CITE_RE = re.compile(
     r'<cite>(https?://[^<]+)</cite>', re.I,
 )
 
-# Yahoo: extract from redirect URLs and direct links
+# Yahoo
 _YAHOO_LINK_RE = re.compile(
     r'class="[^"]*(?:ac-algo|algo-sr|td-u|fz-ms)[^"]*"[^>]*href="([^"]+)"',
     re.I | re.S,
@@ -88,7 +139,7 @@ _YAHOO_LINK_RE = re.compile(
 _YAHOO_RU_RE = re.compile(r"RU=(https?[^/]+)", re.I)
 _YAHOO_RU_FULL_RE = re.compile(r"RU=(https?://[^&/]+[^&]*)", re.I)
 
-# Google: extract from result links and cite tags
+# Google
 _GOOGLE_LINK_RE = re.compile(
     r'<a[^>]+href="(https?://(?!www\.google\.)[^"]+)"[^>]*>',
     re.I,
@@ -102,7 +153,7 @@ _GOOGLE_DATA_RE = re.compile(
     re.I,
 )
 
-# Ask.com: various patterns
+# Ask.com
 _ASK_LINK_RE = re.compile(
     r'class="[^"]*result-link[^"]*"[^>]*href="(https?://[^"]+)"',
     re.I,
@@ -116,7 +167,11 @@ _ASK_ALGO_RE = re.compile(
     re.I | re.S,
 )
 
+# Callback types
 OnResultsCallback = Callable[[list[str]], None] | None
+OnProgressCallback = Callable[[dict], None] | None
+OnEngineStatusCallback = Callable[[dict], None] | None
+OnLogCallback = Callable[[str], None] | None
 
 AVAILABLE_ENGINES = ["duckduckgo", "bing", "yahoo", "google", "ask"]
 
@@ -130,10 +185,7 @@ def _random_ua() -> str:
 # ---------------------------------------------------------------------------
 
 def _extract_ddg_urls(html: str) -> list[str]:
-    """Extract URLs from DuckDuckGo HTML results."""
     urls: list[str] = []
-
-    # Primary: result__a links with uddg parameter
     for match in _DDG_LINK_RE.finditer(html):
         raw = match.group(1)
         uddg = _DDG_UDDG_RE.search(raw)
@@ -146,8 +198,6 @@ def _extract_ddg_urls(html: str) -> list[str]:
                 pass
         elif raw.startswith("http"):
             urls.append(raw)
-
-    # Fallback: result__url links
     if not urls:
         for match in _DDG_RESULT_URL_RE.finditer(html):
             raw = match.group(1)
@@ -155,34 +205,25 @@ def _extract_ddg_urls(html: str) -> list[str]:
                 urls.append(raw)
             elif raw.startswith("//"):
                 urls.append("https:" + raw)
-
     return urls
 
 
 def _extract_bing_urls(html: str) -> list[str]:
-    """Extract URLs from Bing HTML results."""
     seen: set[str] = set()
     urls: list[str] = []
-
-    # Try multiple patterns
     for pattern in [_BING_LINK_RE, _BING_LINK_RE2, _BING_CITE_RE]:
         for m in pattern.finditer(html):
             url = m.group(1).strip()
             if url.startswith("http") and url not in seen:
-                # Filter Bing internal URLs
                 if "bing.com" not in url and "microsoft.com" not in url:
                     seen.add(url)
                     urls.append(url)
-
     return urls
 
 
 def _extract_yahoo_urls(html: str) -> list[str]:
-    """Extract URLs from Yahoo HTML results."""
     urls: list[str] = []
     seen: set[str] = set()
-
-    # Primary: extract from redirect URLs (RU= parameter)
     for match in _YAHOO_RU_FULL_RE.finditer(html):
         try:
             decoded = urllib.parse.unquote(match.group(1))
@@ -192,12 +233,9 @@ def _extract_yahoo_urls(html: str) -> list[str]:
                     urls.append(decoded)
         except Exception:
             pass
-
-    # Fallback: direct links from algo results
     if not urls:
         for match in _YAHOO_LINK_RE.finditer(html):
             raw = match.group(1)
-            # Check for RU redirect
             ru_match = _YAHOO_RU_RE.search(raw)
             if ru_match:
                 try:
@@ -212,15 +250,12 @@ def _extract_yahoo_urls(html: str) -> list[str]:
                 if raw not in seen:
                     seen.add(raw)
                     urls.append(raw)
-
     return urls
 
 
 def _extract_google_urls(html: str) -> list[str]:
-    """Extract URLs from Google HTML results."""
     urls: list[str] = []
     seen: set[str] = set()
-
     _skip_domains = {
         "google.com", "googleapis.com", "gstatic.com",
         "accounts.google.com", "maps.google.com",
@@ -239,45 +274,36 @@ def _extract_google_urls(html: str) -> list[str]:
             pass
         return False
 
-    # Cite tags (most reliable for actual result URLs)
     for match in _GOOGLE_CITE_RE.finditer(html):
         url = match.group(1).strip()
         if url.startswith("http") and not _is_google_internal(url):
             if url not in seen:
                 seen.add(url)
                 urls.append(url)
-
-    # Data-href attributes
     for match in _GOOGLE_DATA_RE.finditer(html):
         url = match.group(1)
         if url.startswith("http") and not _is_google_internal(url):
             if url not in seen:
                 seen.add(url)
                 urls.append(url)
-
-    # Regular href links
     for match in _GOOGLE_LINK_RE.finditer(html):
         url = match.group(1)
         if url.startswith("http") and not _is_google_internal(url):
             if url not in seen:
                 seen.add(url)
                 urls.append(url)
-
     return urls
 
 
 def _extract_ask_urls(html: str) -> list[str]:
-    """Extract URLs from Ask.com HTML results."""
     seen: set[str] = set()
     urls: list[str] = []
-
     for pattern in [_ASK_LINK_RE, _ASK_LINK_RE2, _ASK_ALGO_RE]:
         for match in pattern.finditer(html):
             url = match.group(1)
             if url.startswith("http") and "ask.com" not in url and url not in seen:
                 seen.add(url)
                 urls.append(url)
-
     return urls
 
 
@@ -295,7 +321,6 @@ _BLOCKED_DOMAINS = {
 
 
 def _is_valid_url(url: str) -> bool:
-    """Check if a URL passes the blocked-domain filter."""
     try:
         parsed = urlparse(url)
         host = parsed.netloc.lower()
@@ -316,7 +341,11 @@ def _is_valid_url(url: str) -> bool:
 class FreeSearchEngine:
     """Processes dork queries using free web search engines.
 
-    Supports optional proxy rotation for all requests.
+    Supports:
+      - Optional proxy rotation for all requests
+      - Engine status tracking with callbacks
+      - Configurable delay between requests
+      - Per-query progress and log callbacks
     """
 
     def __init__(
@@ -325,6 +354,8 @@ class FreeSearchEngine:
         engines: Optional[list[str]] = None,
         pages_per_dork: int = 1,
         proxies: Optional[list[str]] = None,
+        delay_min: float = 1.0,
+        delay_max: float = 3.0,
     ) -> None:
         self._queries = queries or []
         self._engines = [
@@ -338,20 +369,29 @@ class FreeSearchEngine:
         self._lock = asyncio.Lock()
         self._proxies = proxies or []
         self._proxy_index = 0
+        self._delay_min = max(0.1, delay_min)
+        self._delay_max = max(self._delay_min, delay_max)
+
+        # Engine status tracking
+        self._engine_states: dict[str, EngineState] = {}
+        for eng_id in self._engines:
+            total_q = len(self._queries) * self._pages_per_dork
+            self._engine_states[eng_id] = EngineState(
+                engine=eng_id,
+                name=ENGINE_DISPLAY_NAMES.get(eng_id, eng_id),
+                queries_total=total_q,
+            )
 
     def _get_proxy(self) -> Optional[str]:
-        """Get next proxy in rotation, or None if no proxies."""
         if not self._proxies:
             return None
         proxy = self._proxies[self._proxy_index % len(self._proxies)]
         self._proxy_index += 1
-        # Ensure proxy has scheme
         if not proxy.startswith("http://") and not proxy.startswith("https://") and not proxy.startswith("socks"):
             proxy = "http://" + proxy
         return proxy
 
     def _make_client(self, proxy: Optional[str] = None) -> httpx.AsyncClient:
-        """Create an httpx AsyncClient with optional proxy."""
         kwargs = {
             "timeout": 20,
             "follow_redirects": True,
@@ -361,15 +401,28 @@ class FreeSearchEngine:
             kwargs["proxy"] = proxy
         return httpx.AsyncClient(**kwargs)
 
+    @property
+    def engine_states(self) -> dict[str, EngineState]:
+        return dict(self._engine_states)
+
+    def get_engine_states_list(self) -> list[dict]:
+        return [st.to_dict() for st in self._engine_states.values()]
+
     async def search_all(
         self,
         on_results: OnResultsCallback = None,
+        on_progress: OnProgressCallback = None,
+        on_engine_status: OnEngineStatusCallback = None,
+        on_log: OnLogCallback = None,
         max_concurrency: int = 3,
     ) -> list[str]:
         """Search all dorks across all selected engines.
 
         Args:
-            on_results: Callback invoked with new URLs as they are discovered.
+            on_results: Callback with new URLs as they are discovered.
+            on_progress: Callback with progress info dict.
+            on_engine_status: Callback when engine status changes.
+            on_log: Callback for log messages.
             max_concurrency: Max concurrent search requests.
 
         Returns:
@@ -395,15 +448,60 @@ class FreeSearchEngine:
             nonlocal completed
             async with sem:
                 proxy = self._get_proxy()
+                state = self._engine_states.get(engine)
+                urls: list[str] = []
+
                 try:
                     async with self._make_client(proxy) as client:
                         urls = await self._search_one(client, query, engine, page)
+
+                    # Update engine state on success
+                    if state:
+                        state.queries_done += 1
+                        state.urls_found += len(urls)
+                        if state.status != EngineStatus.BLOCKED:
+                            state.status = EngineStatus.OK
+
+                    # Log
+                    if on_log and urls:
+                        for u in urls:
+                            on_log(f"[+] Found: {u}")
+
+                except httpx.TimeoutException:
+                    if state:
+                        state.queries_done += 1
+                        state.errors += 1
+                        state.last_error = "Timeout"
+                        state.status = EngineStatus.TIMEOUT
+                    if on_log:
+                        on_log(f"[!] {engine} timeout for: {query[:50]}")
+
+                except httpx.HTTPStatusError as exc:
+                    status_code = exc.response.status_code
+                    if state:
+                        state.queries_done += 1
+                        state.errors += 1
+                        state.last_error = f"HTTP {status_code}"
+                        if status_code in (403, 429, 503):
+                            state.status = EngineStatus.BLOCKED
+                        else:
+                            state.status = EngineStatus.ERROR
+                    if on_log:
+                        on_log(f"[!] {engine} HTTP {status_code} for: {query[:50]}")
+
                 except Exception as exc:
+                    if state:
+                        state.queries_done += 1
+                        state.errors += 1
+                        state.last_error = str(exc)[:100]
+                        if state.status == EngineStatus.PENDING:
+                            state.status = EngineStatus.ERROR
                     logger.debug(
                         "%s search error for '%s' (proxy=%s): %s",
                         engine, query[:50], proxy or "none", exc,
                     )
-                    urls = []
+                    if on_log:
+                        on_log(f"[!] {engine} error for: {query[:50]} - {str(exc)[:60]}")
 
                 completed += 1
 
@@ -411,14 +509,36 @@ class FreeSearchEngine:
                     async with self._lock:
                         on_results(urls)
 
+                # Engine status callback
+                if on_engine_status and state:
+                    on_engine_status(state.to_dict())
+
+                # Progress callback
+                if on_progress:
+                    on_progress({
+                        "completed": completed,
+                        "total": total,
+                        "percent": round(completed / total * 100, 1) if total else 0,
+                        "engine": engine,
+                        "query": query[:60],
+                        "urls_in_batch": len(urls),
+                        "total_urls": len(self._seen_urls),
+                    })
+
                 if completed % 5 == 0 or completed == total:
                     logger.info(
                         "Free search progress: %d/%d | %d unique URLs",
                         completed, total, len(self._seen_urls),
                     )
 
-                # Polite delay to avoid rate limiting
-                delay = random.uniform(1.0, 3.0) if not self._proxies else random.uniform(0.5, 1.5)
+                # Configurable delay
+                if self._proxies:
+                    delay = random.uniform(
+                        self._delay_min * 0.5,
+                        self._delay_max * 0.5,
+                    )
+                else:
+                    delay = random.uniform(self._delay_min, self._delay_max)
                 await asyncio.sleep(delay)
                 return urls
 
@@ -439,7 +559,6 @@ class FreeSearchEngine:
     async def _search_one(
         self, client: httpx.AsyncClient, query: str, engine: str, page: int,
     ) -> list[str]:
-        """Dispatch to the correct engine search method."""
         dispatch = {
             "duckduckgo": self._search_ddg,
             "bing": self._search_bing,
@@ -451,16 +570,11 @@ class FreeSearchEngine:
         if fn is None:
             logger.warning("Unknown engine: %s", engine)
             return []
-        try:
-            return await fn(client, query, page)
-        except Exception as exc:
-            logger.debug("%s search error for '%s': %s", engine, query[:50], exc)
-            return []
+        return await fn(client, query, page)
 
     async def _search_ddg(
         self, client: httpx.AsyncClient, query: str, page: int,
     ) -> list[str]:
-        """Search DuckDuckGo using HTML endpoint."""
         headers = {
             "User-Agent": _random_ua(),
             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
@@ -476,15 +590,12 @@ class FreeSearchEngine:
             data["dc"] = str((page - 1) * 30 + 1)
 
         resp = await client.post(_DDG_URL, data=data, headers=headers)
-        if resp.status_code != 200:
-            logger.debug("DDG returned status %d for '%s'", resp.status_code, query[:40])
-            return []
+        resp.raise_for_status()
         return self._deduplicate(_extract_ddg_urls(resp.text))
 
     async def _search_bing(
         self, client: httpx.AsyncClient, query: str, page: int,
     ) -> list[str]:
-        """Search Bing."""
         headers = {
             "User-Agent": _random_ua(),
             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
@@ -496,15 +607,12 @@ class FreeSearchEngine:
             params["first"] = str((page - 1) * 50 + 1)
 
         resp = await client.get(_BING_URL, params=params, headers=headers)
-        if resp.status_code != 200:
-            logger.debug("Bing returned status %d for '%s'", resp.status_code, query[:40])
-            return []
+        resp.raise_for_status()
         return self._deduplicate(_extract_bing_urls(resp.text))
 
     async def _search_yahoo(
         self, client: httpx.AsyncClient, query: str, page: int,
     ) -> list[str]:
-        """Search Yahoo."""
         headers = {
             "User-Agent": _random_ua(),
             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
@@ -516,19 +624,12 @@ class FreeSearchEngine:
             params["b"] = str((page - 1) * 10 + 1)
 
         resp = await client.get(_YAHOO_URL, params=params, headers=headers)
-        if resp.status_code != 200:
-            logger.debug("Yahoo returned status %d for '%s'", resp.status_code, query[:40])
-            return []
+        resp.raise_for_status()
         return self._deduplicate(_extract_yahoo_urls(resp.text))
 
     async def _search_google(
         self, client: httpx.AsyncClient, query: str, page: int,
     ) -> list[str]:
-        """Search Google.
-
-        Note: Google is aggressive with bot detection.
-        Use fewer results per page and longer delays.
-        """
         headers = {
             "User-Agent": _random_ua(),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -542,15 +643,12 @@ class FreeSearchEngine:
             params["start"] = str((page - 1) * 20)
 
         resp = await client.get(_GOOGLE_URL, params=params, headers=headers)
-        if resp.status_code != 200:
-            logger.debug("Google returned status %d for '%s'", resp.status_code, query[:40])
-            return []
+        resp.raise_for_status()
         return self._deduplicate(_extract_google_urls(resp.text))
 
     async def _search_ask(
         self, client: httpx.AsyncClient, query: str, page: int,
     ) -> list[str]:
-        """Search Ask.com."""
         headers = {
             "User-Agent": _random_ua(),
             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
@@ -562,16 +660,12 @@ class FreeSearchEngine:
             params["page"] = str(page)
 
         resp = await client.get(_ASK_URL, params=params, headers=headers)
-        if resp.status_code != 200:
-            logger.debug("Ask returned status %d for '%s'", resp.status_code, query[:40])
-            return []
+        resp.raise_for_status()
         return self._deduplicate(_extract_ask_urls(resp.text))
 
     def _deduplicate(self, urls: list[str]) -> list[str]:
-        """Deduplicate URLs against the global seen set."""
         results: list[str] = []
         for url in urls:
-            # Normalize: remove fragment and trailing slash
             url = url.split("#")[0].rstrip("/")
             if url and url not in self._seen_urls and _is_valid_url(url):
                 self._seen_urls.add(url)

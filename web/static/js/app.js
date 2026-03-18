@@ -1,7 +1,7 @@
 /**
- * DorkMaster v7 -- Unified Frontend
+ * DorkMaster v8 -- Unified Frontend
  * Generator + Hunter (FREE/PREMIUM) + Scanner + Settings
- * Features: quota tracking, virtual scrolling, URL sanitization
+ * Features: custom param builder, engine status, debug log, improved progress
  */
 (function(){
 'use strict';
@@ -12,12 +12,12 @@ let huntUrls=[], huntFiltered=[], isHunting=false, huntSearchMode='free';
 let scanReport=null, scanFiltered=[], isScanning=false;
 let currentMode='generator';
 let quotaData=null;
+let showDebugLog=false;
 
 const $=s=>document.querySelector(s);
 const $$=s=>document.querySelectorAll(s);
 const el={};
 
-/* Max items to render at once for performance */
 const RENDER_LIMIT=500;
 
 function cache(){
@@ -29,11 +29,15 @@ function cache(){
      'sendHunt','sendScan','statPossibleVal','statGeneratedVal','statPossible','statGenerated',
      'overlay','overlayTitle','overlaySub',
      'huntDorks','huntDorkCount','huntFileUpload','huntClearDorks','huntEngines',
-     'huntPages','huntConc','huntBtn','huntSearch','huntUrlCount','huntEmpty','huntList',
+     'huntPages','huntConc','huntDelayMin','huntDelayMax',
+     'huntBtn','huntSearch','huntUrlCount','huntEmpty','huntList',
      'huntBody','huntCopyAll','huntExpTxt','huntExpCsv','huntExpJson','huntProgress',
      'huntProgressFill','huntProgressText','huntProgressNum','sendUrlsToScan',
      'huntModeCardFree','huntModeCardApi','huntUseProxy','huntFreeEnginesCard',
      'quotaBarHunter','quotaFillHunter','quotaTextHunter','quotaRemHunter',
+     'engineStatusBar','debugLog','debugLogBody','clearLog','toggleLog',
+     'paramFileType','paramCustomType','paramName','paramPreview','paramPreviewUrl',
+     'paramPreviewDorks','paramAddBtn',
      'scanUrls','scanUrlCount','scanFileUpload','scanClearUrls','scanSqli','scanXss',
      'scanConc','scanTimeout','scanRate','scanBtn','scanSearch','scanResCount',
      'scanEmpty','scanList','scanBody','scanProgress','scanProgressFill','scanProgressText',
@@ -55,7 +59,7 @@ async function init(){
         engineConfig=await r.json();
     }catch(e){toast('Failed to load config','err');return}
     setupNav();setupEngine();renderOps();renderFt();renderVulnParams();
-    bindGen();bindHunt();bindScan();bindSettings();
+    bindGen();bindParamBuilder();bindHunt();bindScan();bindSettings();
     updateCounts();syncGenAll();loadStatus();
 }
 
@@ -84,7 +88,7 @@ function setupEngine(){
             o.classList.add('engine-opt--on');
             currentEngine=o.dataset.engine;
             o.querySelector('input').checked=true;
-            renderOps();renderFt();renderVulnParams();updateCounts();
+            renderOps();renderFt();renderVulnParams();updateCounts();updateParamPreview();
         });
     });
 }
@@ -147,10 +151,84 @@ function renderVulnParams(){
         });
     }
 }
-function updateVpCount(){
-    if(el.vpCount)el.vpCount.textContent=getVps().length;
-}
+function updateVpCount(){if(el.vpCount)el.vpCount.textContent=getVps().length}
 function getVps(){return el.vpGrid?[...el.vpGrid.querySelectorAll('.chip--on')].map(c=>c.dataset.vulnparam):[]}
+
+/* -- Custom Param Builder -- */
+function bindParamBuilder(){
+    const inputs=[el.paramFileType,el.paramCustomType,el.paramName];
+    inputs.forEach(inp=>{if(inp)inp.addEventListener('input',updateParamPreview)});
+    if(el.paramFileType)el.paramFileType.addEventListener('change',updateParamPreview);
+
+    // Preset param buttons
+    $$('.param-preset').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+            if(el.paramName)el.paramName.value=btn.dataset.param;
+            updateParamPreview();
+        });
+    });
+
+    if(el.paramAddBtn)el.paramAddBtn.addEventListener('click',addCustomParam);
+}
+function getFileType(){
+    const custom=el.paramCustomType?.value.trim();
+    if(custom){
+        return custom.startsWith('.')?custom:'.'+custom;
+    }
+    return el.paramFileType?.value||'.php';
+}
+function updateParamPreview(){
+    const ft=getFileType();
+    const param=el.paramName?.value.trim();
+    if(!param){hideEl(el.paramPreview);return}
+
+    const pattern=`${ft}?${param}=`;
+    showEl(el.paramPreview);
+    if(el.paramPreviewUrl){
+        el.paramPreviewUrl.textContent=`example${pattern}`;
+    }
+
+    // Show engine-specific dorks
+    const syntax=engineConfig?.engine_dork_syntax||{};
+    if(el.paramPreviewDorks){
+        el.paramPreviewDorks.innerHTML='';
+        Object.entries(syntax).forEach(([eng,info])=>{
+            const div=document.createElement('div');
+            div.className='param-preview__dork';
+            let dork;
+            if(info.supports_inurl){
+                dork=info.inurl_syntax.replace('{pattern}',pattern);
+            }else{
+                dork=`"${pattern}"`;
+            }
+            div.innerHTML=`<span class="param-preview__dork-engine">${eng}</span><span class="param-preview__dork-text">${esc(dork)}</span>`;
+            el.paramPreviewDorks.appendChild(div);
+        });
+    }
+}
+function addCustomParam(){
+    const ft=getFileType();
+    const param=el.paramName?.value.trim();
+    if(!param){toast('Enter a parameter name','warn');return}
+
+    const pattern=`${ft}?${param}=`;
+
+    // Add to vuln params grid
+    if(el.vpGrid){
+        const existing=el.vpGrid.querySelector(`[data-vulnparam="${CSS.escape(pattern)}"]`);
+        if(existing){
+            existing.classList.add('chip--on');
+            toast('Pattern already exists, activated');
+        }else{
+            const c=document.createElement('button');c.type='button';
+            c.className='chip chip--on';c.dataset.vulnparam=pattern;c.textContent=pattern;
+            c.addEventListener('click',()=>{c.classList.toggle('chip--on');updateVpCount()});
+            el.vpGrid.appendChild(c);
+            toast(`Added: ${pattern}`);
+        }
+        updateVpCount();updateCounts();
+    }
+}
 
 function bindGen(){
     el.genBtn?.addEventListener('click',generate);
@@ -326,18 +404,21 @@ function bindHunt(){
         if(el.scanUrls)el.scanUrls.value=huntFiltered.join('\n');
         updateScanUrlCount();switchMode('scanner');toast('Sent '+huntFiltered.length+' URLs to Scanner');
     });
-    // Mode cards
     el.huntModeCardFree?.addEventListener('click',()=>setHuntMode('free'));
     el.huntModeCardApi?.addEventListener('click',()=>setHuntMode('api'));
+    // Debug log toggle
+    el.toggleLog?.addEventListener('click',()=>{
+        showDebugLog=!showDebugLog;
+        if(showDebugLog){showEl(el.debugLog);el.toggleLog.classList.add('btn--teal');el.toggleLog.classList.remove('btn--ghost')}
+        else{hideEl(el.debugLog);el.toggleLog.classList.remove('btn--teal');el.toggleLog.classList.add('btn--ghost')}
+    });
+    el.clearLog?.addEventListener('click',()=>{if(el.debugLogBody)el.debugLogBody.innerHTML=''});
 }
 function setHuntMode(mode){
     huntSearchMode=mode;
     el.huntModeCardFree?.classList.toggle('mode-card--active',mode==='free');
     el.huntModeCardApi?.classList.toggle('mode-card--active',mode==='api');
-    if(el.huntFreeEnginesCard){
-        el.huntFreeEnginesCard.style.display=mode==='free'?'':'none';
-    }
-    // Update button label
+    if(el.huntFreeEnginesCard){el.huntFreeEnginesCard.style.display=mode==='free'?'':'none'}
     if(el.huntBtn){
         if(mode==='api'){
             el.huntBtn.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Start PREMIUM Hunt';
@@ -361,6 +442,40 @@ function updateHuntQuotaBar(){
     }
 }
 function updateHuntDorkCount(){if(el.huntDorks&&el.huntDorkCount)el.huntDorkCount.textContent=el.huntDorks.value.split('\n').filter(l=>l.trim()).length}
+
+function addLogLine(msg){
+    if(!el.debugLogBody)return;
+    const div=document.createElement('div');
+    div.className='debug-log__line';
+    if(msg.startsWith('[+]'))div.className+=' debug-log__line--found';
+    else if(msg.startsWith('[!]'))div.className+=' debug-log__line--error';
+    else div.className+=' debug-log__line--info';
+    div.textContent=msg;
+    el.debugLogBody.appendChild(div);
+    el.debugLogBody.scrollTop=el.debugLogBody.scrollHeight;
+}
+
+function updateEngineStatus(status){
+    if(!el.engineStatusBar)return;
+    let item=el.engineStatusBar.querySelector(`[data-engine="${status.engine}"]`);
+    if(!item){
+        item=document.createElement('div');
+        item.className='engine-status';
+        item.dataset.engine=status.engine;
+        item.innerHTML=`<span class="engine-status__dot engine-status__dot--pending"></span><span class="engine-status__name">${esc(status.name)}</span><span class="engine-status__info"></span>`;
+        el.engineStatusBar.appendChild(item);
+    }
+    const dot=item.querySelector('.engine-status__dot');
+    if(dot){
+        dot.className='engine-status__dot engine-status__dot--'+status.status;
+    }
+    const info=item.querySelector('.engine-status__info');
+    if(info){
+        info.textContent=`${status.queries_done}/${status.queries_total} | ${status.urls_found} URLs`;
+        if(status.errors>0)info.textContent+=` | ${status.errors} err`;
+    }
+}
+
 async function huntSearch(){
     if(isHunting)return;
     const dorks=el.huntDorks?.value.split('\n').map(l=>l.trim()).filter(l=>l)||[];
@@ -373,31 +488,33 @@ async function huntSearch(){
         if(!engs.length){toast('Select at least one engine','warn');return}
     }
 
-    // Premium mode: check if keys exist
     if(huntSearchMode==='api'){
-        if(!quotaData||quotaData.total_keys===0){
-            toast('No API keys configured! Go to Settings to add Serper.dev keys.','err');
-            return;
-        }
-        if(quotaData.total_remaining===0){
-            toast('All API keys exhausted (0 queries left). Add new keys or reset quota.','err');
-            return;
-        }
+        if(!quotaData||quotaData.total_keys===0){toast('No API keys configured! Go to Settings.','err');return}
+        if(quotaData.total_remaining===0){toast('All API keys exhausted.','err');return}
     }
 
-    const pages=parseInt(el.huntPages?.value,10)||1,conc=parseInt(el.huntConc?.value,10)||3;
+    const pages=parseInt(el.huntPages?.value,10)||1;
+    const conc=parseInt(el.huntConc?.value,10)||3;
+    const delayMin=parseFloat(el.huntDelayMin?.value)||1.0;
+    const delayMax=parseFloat(el.huntDelayMax?.value)||3.0;
+
     isHunting=true;huntUrls=[];huntFiltered=[];
     showEl(el.huntProgress);hideEl(el.huntEmpty);showEl(el.huntList);
+    if(huntSearchMode==='free')showEl(el.engineStatusBar);else hideEl(el.engineStatusBar);
+    if(el.engineStatusBar)el.engineStatusBar.innerHTML='';
     if(el.huntList)el.huntList.innerHTML='';
+    if(el.debugLogBody)el.debugLogBody.innerHTML='';
     setProgress(el.huntProgressFill,5);
+
+    const totalQueries=dorks.length*engs.length*pages;
     const modeLabel=huntSearchMode==='api'?'Serper API (PREMIUM)':engs.join(', ')+' (FREE)';
-    if(el.huntProgressText)el.huntProgressText.textContent=`Searching ${dorks.length} dorks via ${modeLabel}${useProxy?' (proxy)':''}...`;
+    if(el.huntProgressText)el.huntProgressText.textContent=`Progress: 0% (0/${totalQueries} queries) via ${modeLabel}`;
     if(el.huntProgressNum)el.huntProgressNum.textContent='0 URLs';
     el.huntBtn&&(el.huntBtn.disabled=true);
     updateHuntBtns();
     let cnt=0;
     try{
-        const body={dorks,search_mode:huntSearchMode,engines:engs,pages_per_dork:pages,max_concurrency:conc,use_proxy:useProxy};
+        const body={dorks,search_mode:huntSearchMode,engines:engs,pages_per_dork:pages,max_concurrency:conc,use_proxy:useProxy,delay_min:delayMin,delay_max:delayMax};
         const r=await fetch('/api/hunter/search/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         if(!r.ok){
             const errData=await r.json().catch(()=>({}));
@@ -412,18 +529,34 @@ async function huntSearch(){
                 else if(ln.startsWith('data: ')){
                     try{
                         const d=JSON.parse(ln.substring(6));
-                        if(evtType==='url'){cnt++;huntUrls.push(d.url);huntFiltered.push(d.url);if(cnt<=RENDER_LIMIT)appendUrl(d.url,cnt);if(el.huntUrlCount)el.huntUrlCount.textContent=cnt+' URLs';if(el.huntProgressNum)el.huntProgressNum.textContent=cnt+' URLs'}
-                        else if(evtType==='progress'){setProgress(el.huntProgressFill,Math.min(90,5+(cnt/Math.max(1,dorks.length))*85))}
+                        if(evtType==='url'){
+                            cnt++;huntUrls.push(d.url);huntFiltered.push(d.url);
+                            if(cnt<=RENDER_LIMIT)appendUrl(d.url,cnt);
+                            if(el.huntUrlCount)el.huntUrlCount.textContent=cnt+' URLs';
+                            if(el.huntProgressNum)el.huntProgressNum.textContent=cnt+' URLs';
+                        }
+                        else if(evtType==='progress'){
+                            const pct=d.percent||0;
+                            setProgress(el.huntProgressFill,Math.max(5,pct));
+                            if(el.huntProgressText)el.huntProgressText.textContent=`Progress: ${Math.round(pct)}% (${d.completed||0}/${d.total||totalQueries} queries)`;
+                        }
+                        else if(evtType==='engine_status'){
+                            updateEngineStatus(d);
+                        }
+                        else if(evtType==='log'){
+                            addLogLine(d.message||'');
+                        }
                         else if(evtType==='done'){
                             setProgress(el.huntProgressFill,100);
                             if(el.huntProgressText)el.huntProgressText.textContent='Done!';
                             if(el.huntProgressNum)el.huntProgressNum.textContent=(d.total_urls||cnt)+' URLs';
-                            // Update quota from premium search
-                            if(d.quota){
-                                quotaData=d.quota;
-                                updateHuntQuotaBar();
+                            if(d.quota){quotaData=d.quota;updateHuntQuotaBar();
                                 const qUsed=d.queries_used||0;
                                 if(qUsed>0)toast(`PREMIUM: Used ${qUsed} API queries. ${d.quota.total_remaining.toLocaleString()} remaining.`);
+                            }
+                            // Final engine states
+                            if(d.engine_states){
+                                d.engine_states.forEach(s=>updateEngineStatus(s));
                             }
                         }
                         else if(evtType==='error')toast('Error: '+(d.error||'Unknown'),'err');
@@ -439,8 +572,8 @@ async function huntSearch(){
     }catch(e){toast('Hunt failed: '+e.message,'err')}
     finally{
         isHunting=false;el.huntBtn&&(el.huntBtn.disabled=false);
-        setHuntMode(huntSearchMode); // reset button text
-        setTimeout(()=>hideEl(el.huntProgress),3000);
+        setHuntMode(huntSearchMode);
+        setTimeout(()=>hideEl(el.huntProgress),5000);
     }
 }
 function appendUrl(url,n){if(!el.huntList)return;el.huntList.appendChild(mkUrlRow(url,n));if(el.huntBody)el.huntBody.scrollTop=el.huntBody.scrollHeight}
@@ -664,7 +797,6 @@ function bindSettings(){
         }catch(e){toast('Test failed','err')}
         finally{el.testProxiesBtn&&(el.testProxiesBtn.disabled=false)}
     });
-    // Reset quota
     el.resetQuotaBtn?.addEventListener('click',async()=>{
         if(!confirm('Reset all quota counters to 0?'))return;
         try{
@@ -685,7 +817,6 @@ async function loadStatus(){
         if(el.stProxyCount){el.stProxyCount.textContent=(d.proxy_count||0)+' proxies';el.stProxyCount.className='status-val'+((d.proxy_count||0)>0?'':' status-val--off')}
         if(el.setProxyOn)el.setProxyOn.checked=d.proxy_enabled;
         if(d.proxies&&el.setProxies&&!el.setProxies.value)el.setProxies.value=d.proxies.join('\n');
-        // Quota
         if(d.quota){quotaData=d.quota;renderQuota()}
     }catch(_){}
 }
@@ -695,10 +826,8 @@ function renderQuota(){
     if(el.quotaCapacity)el.quotaCapacity.textContent=quotaData.total_capacity.toLocaleString();
     if(el.quotaUsed)el.quotaUsed.textContent=quotaData.total_used.toLocaleString();
     if(el.quotaRemaining)el.quotaRemaining.textContent=quotaData.total_remaining.toLocaleString();
-    // Fill bar
     const pct=quotaData.total_capacity>0?Math.round(quotaData.total_used/quotaData.total_capacity*100):0;
     if(el.quotaFillSettings)el.quotaFillSettings.style.width=pct+'%';
-    // Per-key list
     if(el.quotaKeyList){
         if(!quotaData.keys||!quotaData.keys.length){
             el.quotaKeyList.innerHTML='<p class="hint">No API keys configured.</p>';
